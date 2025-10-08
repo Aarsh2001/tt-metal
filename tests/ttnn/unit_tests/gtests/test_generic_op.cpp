@@ -785,8 +785,16 @@ TEST_F(TTNNFixtureWithDevice, TestGenericOpEltwiseSFPU) {
 //    b. binary_hash = <hash from step 1>
 //    c. source_type = tt::tt_metal::KernelDescriptor::SourceType::BINARY_PATH
 TEST_F(TTNNFixtureWithDevice, TestGenericOpMatmulFromBinary) {
-    const std::string binary_kernel_path = "tests/ttnn/unit_tests/matmul_binaries";
+    std::string binary_kernel_path;
     auto device = this->device_;
+
+    if (device->arch() == tt::ARCH::WORMHOLE_B0) {
+        binary_kernel_path = "tests/ttnn/unit_tests/matmul_binaries/wormhole/kernels";
+    } else if (device->arch() == tt::ARCH::BLACKHOLE) {
+        binary_kernel_path = "tests/ttnn/unit_tests/matmul_binaries/blackhole/kernels";
+    } else {
+        TT_THROW("arch not supported");
+    }
 
     // 1. Set the binary path prefix for the device.
     tt::tt_metal::experimental::SetKernelBinaryPathPrefix(device, binary_kernel_path);

@@ -194,8 +194,8 @@ TEST_F(CompileProgramWithKernelPathEnvVarFixture, TensixTestDifferentUnpackToDes
 // But the method is the same.
 TEST_F(MeshDispatchFixture, TestCreateKernelFromBinary) {
     const std::string kernel_file = "tests/tt_metal/tt_metal/test_kernels/compute/simple_add.cpp";
-    const std::string binary_kernel_path = "tests/tt_metal/tt_metal/api/simple_add_binaries";
-
+    std::string binary_kernel_path;
+    
     for (const auto& mesh_device : this->devices_) {
         CoreCoord core = {0, 0};
         CoreCoord binary_core = {1, 1};
@@ -209,6 +209,14 @@ TEST_F(MeshDispatchFixture, TestCreateKernelFromBinary) {
         workload.add_program(device_range, std::move(program));
         auto& program_ = workload.get_programs().at(device_range);
         auto device = mesh_device->get_devices()[0];
+
+        if (device->arch() == tt::ARCH::WORMHOLE_B0) {
+            binary_kernel_path = "tests/tt_metal/tt_metal/api/simple_add_binaries/wormhole/kernels";
+        } else if (device->arch() == tt::ARCH::BLACKHOLE) {
+            binary_kernel_path = "tests/tt_metal/tt_metal/api/simple_add_binaries/blackhole/kernels";
+        } else {
+            TT_THROW("arch not supported");
+        }
 
         const uint32_t table_address = mesh_device->allocator()->get_base_allocator_addr(tt_metal::HalMemType::L1);
         uint32_t input_a = 1;

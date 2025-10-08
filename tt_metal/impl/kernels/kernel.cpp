@@ -145,9 +145,8 @@ std::string KernelSource::generate_elf_path(
         // Construct full path matching JIT structure: prefix/kernel_full_name/processor_dir/processor_dir.elf
         // kernel_full_name already contains trailing slash
         return fmt::format(
-            "{}/{}/kernels/{}{}/{}.elf",
+            "{}/{}{}/{}.elf",
             device_prefix,
-            BuildEnvManager::get_instance().get_device_build_env(device->build_id()).build_key,
             kernel_full_name,
             processor_dir,
             processor_dir);
