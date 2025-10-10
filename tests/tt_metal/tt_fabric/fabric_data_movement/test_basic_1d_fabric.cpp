@@ -429,8 +429,6 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
     uint32_t num_packets = 10;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
-    const auto fabric_config = tt::tt_metal::MetalContext::instance().get_fabric_config();
-
     // common compile time args for sender and receiver
     // Note: see run_unicast_dw_chips() for DRAM coverage
     std::vector<uint32_t> compile_time_args = {
@@ -439,7 +437,6 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
         worker_mem_map.target_address,
         0 /* use_dram_dst */,
         topology == Topology::Mesh,
-        fabric_config == tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC,
         0 /* is_chip_multicast */,
         0 /* additional_dir */};
 
@@ -549,7 +546,6 @@ void run_unicast_test_bw_chips(
     auto receiver_device = fixture->get_device(dst_physical_device_id);
     CoreCoord receiver_virtual_core = receiver_device->worker_core_from_logical_core(receiver_logical_core);
 
-    const auto fabric_config = tt::tt_metal::MetalContext::instance().get_fabric_config();
     const auto topology = control_plane.get_fabric_context().get_fabric_topology();
     uint32_t is_2d_fabric = topology == Topology::Mesh;
 
@@ -565,7 +561,6 @@ void run_unicast_test_bw_chips(
         worker_mem_map.target_address,
         use_dram_dst,
         topology == Topology::Mesh,
-        fabric_config == tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC,
         0 /* is_chip_multicast */,
         0 /* additional_dir */};
 
@@ -931,8 +926,6 @@ void RunTestMCastConnAPI(
     uint32_t num_packets = 100;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
-    const auto fabric_config = tt::tt_metal::MetalContext::instance().get_fabric_config();
-
     // common compile time args for sender and receiver
     // Note: Fabric Mcast with NOC writes to DRAM provides redudant coverage,
     // so use_dram_dst is set to 0; see run_unicast_dw_chips() for DRAM coverage
@@ -942,7 +935,6 @@ void RunTestMCastConnAPI(
         worker_mem_map.target_address,
         0 /* use_dram_dst */,
         topology == Topology::Mesh,
-        fabric_config == tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC,
         1 /* is_chip_multicast */,
         1 /* additional_dir */};
 
@@ -1382,7 +1374,6 @@ void RunTest2DMCastConnAPI(
     uint32_t num_packets = 100;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
-    const auto fabric_config = tt::tt_metal::MetalContext::instance().get_fabric_config();
     uint32_t mcast_mode;
     auto arbitrary_fabric_node_id = src_fabric_node_id;
     if (north_hops > 0 && south_hops > 0) {
@@ -1428,7 +1419,6 @@ void RunTest2DMCastConnAPI(
         0 /* use_dram_dst */,
         mcast_mode,
         topology == Topology::Mesh,
-        fabric_config == tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC,
         1 /* is_chip_multicast */,
         1 /* additional_dir */};
 
@@ -1739,7 +1729,6 @@ void RunTestChipMCast1D(BaseFabricFixture* fixture, RoutingDirection dir, uint32
         worker_mem_map.target_address,
         0 /* use_dram_dst */,
         0 /* is_2d_fabric */,
-        0 /* use_dynamic_routing */,
         1 /* is_chip_multicast */,
         0 /* additional_dir */};
 
