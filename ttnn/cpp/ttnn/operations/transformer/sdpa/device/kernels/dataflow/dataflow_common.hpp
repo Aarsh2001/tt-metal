@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "dataflow_api.h"
 #include <tt-metalium/constants.hpp>
+#include "debug/assert.h"
 
 template <uint32_t tile_bytes, uint32_t num_readers>
 constexpr uint32_t get_barrier_read_threshold() {
@@ -214,6 +215,106 @@ void fill_neginf_tile_bfp4(uint32_t cb_id, uint32_t tile_id) {
 }
 
 template <uint32_t tile_bytes>
+inline void mask_triu_tile_bfp4(uint32_t cb_id, uint32_t tile_id, int32_t diagonal_offset) {
+    /*
+    Fill a tile with upper triangular mask pattern.
+    For each position (row, col) in the tile:
+    - If col <= row + diagonal_offset: 0 (allowed, lower triangle)
+    - Otherwise: -inf (masked, upper triangle)
+
+    diagonal_offset controls which diagonal is the boundary:
+    - diagonal_offset = 0: main diagonal (standard upper triangular masking)
+    - diagonal_offset > 0: diagonal shifted right (more of lower triangle allowed)
+    - diagonal_offset < 0: diagonal shifted left (more of upper triangle masked)
+    */
+    constexpr uint32_t bf4_mant_per_uint32 = 8;
+    constexpr uint32_t uint32_datums_per_face = 128;
+    constexpr uint32_t uint32_datums_per_face_row = 8;
+
+    // Start with zeros (allowed positions)
+    fill_tile_zeros<tile_bytes>(cb_id, tile_id);
+
+    volatile tt_l1_ptr uint32_t* uint32_ptr =
+        reinterpret_cast<volatile tt_l1_ptr uint32_t*>(get_write_ptr(cb_id) + tile_id * tile_bytes);
+
+    // Process each face of the tile
+    uint32_t face_offsets[4] = {0, uint32_datums_per_face, uint32_datums_per_face * 2, uint32_datums_per_face * 3};
+
+    for (uint32_t face_idx = 0; face_idx < 4; ++face_idx) {
+        uint32_t face_offset = face_offsets[face_idx];
+
+        for (uint32_t row = 0; row < tt::constants::TILE_HEIGHT; ++row) {
+            uint32_t row_offset = row * uint32_datums_per_face_row;
+
+            for (uint32_t col_group = 0; col_group < uint32_datums_per_face_row; ++col_group) {
+                uint32_t mask_value = 0;
+
+                for (uint32_t i = 0; i < bf4_mant_per_uint32; ++i) {
+                    uint32_t col = col_group * bf4_mant_per_uint32 + i;
+
+                    // Check if this position is in the upper triangle (should be masked)
+                    if ((int32_t)col > (int32_t)row + diagonal_offset) {
+                        mask_value |= 0xC << (i * 4);  // Set -inf mantissa (0xC for bfp4)
+                    }
+                }
+
+                uint32_ptr[face_offset + row_offset + col_group] = mask_value;
+            }
+        }
+    }
+}
+
+template <uint32_t tile_bytes>
+void mask_tril_tile_bfp4(uint32_t cb_id, uint32_t tile_id, int32_t diagonal_offset) {
+    /*
+    Fill a tile with lower triangular mask pattern.
+    For each position (row, col) in the tile:
+    - If col <= row + diagonal_offset: 0 (allowed, lower triangle)
+    - Otherwise: -inf (masked, upper triangle)
+
+    diagonal_offset controls which diagonal is the boundary:
+    - diagonal_offset = 0: main diagonal (standard lower triangular)
+    - diagonal_offset > 0: diagonal shifted right (more of upper triangle masked)
+    - diagonal_offset < 0: diagonal shifted left (more of lower triangle allowed)
+    */
+    constexpr uint32_t bf4_mant_per_uint32 = 8;
+    constexpr uint32_t uint32_datums_per_face = 128;
+    constexpr uint32_t uint32_datums_per_face_row = 8;
+
+    // Start with zeros (allowed positions)
+    fill_tile_zeros<tile_bytes>(cb_id, tile_id);
+
+    volatile tt_l1_ptr uint32_t* uint32_ptr =
+        reinterpret_cast<volatile tt_l1_ptr uint32_t*>(get_write_ptr(cb_id) + tile_id * tile_bytes);
+
+    // Process each face of the tile
+    uint32_t face_offsets[4] = {0, uint32_datums_per_face, uint32_datums_per_face * 2, uint32_datums_per_face * 3};
+
+    for (uint32_t face_idx = 0; face_idx < 4; ++face_idx) {
+        uint32_t face_offset = face_offsets[face_idx];
+
+        for (uint32_t row = 0; row < tt::constants::TILE_HEIGHT; ++row) {
+            uint32_t row_offset = row * uint32_datums_per_face_row;
+
+            for (uint32_t col_group = 0; col_group < uint32_datums_per_face_row; ++col_group) {
+                uint32_t mask_value = 0;
+
+                for (uint32_t i = 0; i < bf4_mant_per_uint32; ++i) {
+                    uint32_t col = col_group * bf4_mant_per_uint32 + i;
+
+                    // Check if this position is in the upper triangle (should be masked)
+                    if ((int32_t)col > (int32_t)row + diagonal_offset) {
+                        mask_value |= 0xC << (i * 4);  // Set -inf mantissa (0xC for bfp4)
+                    }
+                }
+
+                uint32_ptr[face_offset + row_offset + col_group] = mask_value;
+            }
+        }
+    }
+}
+
+template <uint32_t tile_bytes>
 inline void fill_diagonal_tile_bfp4(uint32_t cb_id, uint32_t tile_id) {
     // Clear the tile first
     fill_tile_zeros<tile_bytes>(cb_id, tile_id);
@@ -376,8 +477,21 @@ void fill_vertical_tile_bfp4(uint32_t cb_id, uint32_t tile_id, uint32_t unpad_co
     }
 }
 
+enum class MaskType {
+    FULLY_ALLOWED,
+    FULLY_MASKED,
+    TRIU_MASK,  // mask the upper triangle (i.e causal masking on the leading diagonal)
+    TRIL_MASK,  // mask the lower triangle (i.e sliding window masking on the trailing diagonal)
+};
+
 template <uint32_t cb_mask_in>
-void generate_causal_mask(uint32_t Sq_chunk_t, uint32_t Sk_chunk_t, uint32_t q_chunk, uint32_t k_chunk) {
+void generate_mask(
+    uint32_t Sq_chunk_t,
+    uint32_t Sk_chunk_t,
+    uint32_t q_chunk,
+    uint32_t k_chunk,
+    bool is_causal = true,
+    uint32_t sliding_window_size = 0) {
     uint32_t mask_size_tiles = Sq_chunk_t * Sk_chunk_t;
     cb_reserve_back(cb_mask_in, mask_size_tiles);
 
@@ -387,35 +501,143 @@ void generate_causal_mask(uint32_t Sq_chunk_t, uint32_t Sk_chunk_t, uint32_t q_c
 
     int zero_tile_idx = -1;
     int inf_tile_idx = -1;
-    int diag_tile_idx = -1;
+    int triu_diag_tile_idx = -1;
+    int tril_diag_tile_idx = -1;
 
+    int32_t min_window_start, max_window_start, min_window_end, max_window_end;
     for (uint32_t q_tile = 0; q_tile < Sq_chunk_t; ++q_tile) {
+        uint32_t global_q_tile = Sq_chunk_t * q_chunk + q_tile;
+        uint32_t q_tile_start = global_q_tile * tt::constants::TILE_HEIGHT;
+        uint32_t q_tile_end = q_tile_start + tt::constants::TILE_HEIGHT - 1;  // inclusive
+        if (sliding_window_size > 0) {
+            // Calculate the sliding window bounds for this Q tile
+            if (is_causal) {
+                // Causal sliding window: window spans [q_pos - sliding_window_size + 1, q_pos]
+                // For the entire Q tile, we need the union of all windows
+                min_window_start = (int32_t)q_tile_start - (int32_t)sliding_window_size + 1;
+                if (min_window_start < 0) {
+                    min_window_start = 0;
+                }
+                max_window_start = (int32_t)q_tile_end - (int32_t)sliding_window_size + 1;
+                if (max_window_start < 0) {
+                    max_window_start = 0;
+                }
+                max_window_end = (int32_t)q_tile_end + 1;    // exclusive
+                min_window_end = (int32_t)q_tile_start + 1;  // exclusive
+            } else {
+                // Non-causal sliding window: window spans [q_pos - sliding_window_size/2, q_pos +
+                // sliding_window_size/2]
+                int32_t half_window = (int32_t)sliding_window_size / 2;
+                min_window_start = (int32_t)q_tile_start - half_window;
+                if (min_window_start < 0) {
+                    min_window_start = 0;
+                }
+                max_window_start = (int32_t)q_tile_end - half_window;
+                if (max_window_start < 0) {
+                    max_window_start = 0;
+                }
+                max_window_end = (int32_t)q_tile_end + half_window + 1;    // exclusive
+                min_window_end = (int32_t)q_tile_start + half_window + 1;  // exclusive
+            }
+        }
         for (uint32_t k_tile = 0; k_tile < Sk_chunk_t; ++k_tile) {
             uint32_t in_mask_tile_id = q_tile * Sk_chunk_t + k_tile;
-            uint32_t global_q_tile = Sq_chunk_t * q_chunk + q_tile;
             uint32_t global_k_tile = Sk_chunk_t * k_chunk + k_tile;
 
-            if (global_k_tile < global_q_tile) {
-                if (zero_tile_idx == -1) {
-                    fill_tile_zeros<tile_bytes>(cb_mask_in, in_mask_tile_id);
-                    zero_tile_idx = in_mask_tile_id;
+            // Determine the masking pattern for this tile
+            MaskType mask_type = MaskType::FULLY_ALLOWED;
+            int32_t diagonal_offset = 0;
+            if (sliding_window_size > 0) {
+                // Calculate tile boundaries in sequence positions
+                uint32_t k_tile_start = global_k_tile * tt::constants::TILE_HEIGHT;
+                uint32_t k_tile_end = k_tile_start + tt::constants::TILE_HEIGHT - 1;  // inclusive
+
+                // Check if K tile overlaps with the union of all sliding windows for this Q tile
+                bool k_tile_outside_window =
+                    ((int32_t)k_tile_end < min_window_start) ||
+                    ((int32_t)k_tile_start >=
+                     max_window_end);  // outside the start (bottom left) or end of the window (top right)
+                if (k_tile_outside_window) {
+                    // K tile is completely outside all sliding windows
+                    mask_type = MaskType::FULLY_MASKED;
                 } else {
-                    copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, zero_tile_idx, in_mask_tile_id);
-                }
-            } else if (global_k_tile == global_q_tile) {
-                if (diag_tile_idx == -1) {
-                    fill_diagonal_tile_bfp4<tile_bytes>(cb_mask_in, in_mask_tile_id);
-                    diag_tile_idx = in_mask_tile_id;
-                } else {
-                    copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, diag_tile_idx, in_mask_tile_id);
+                    // K tile overlaps with sliding windows, but we need to check if it's fully contained
+                    bool k_tile_fully_contained =
+                        ((int32_t)k_tile_start >= min_window_start) &&
+                        ((int32_t)k_tile_end < max_window_end);  // fully contained within the window
+                    if (k_tile_fully_contained) {
+                        mask_type = MaskType::FULLY_ALLOWED;
+                    } else {
+                        if ((int32_t)k_tile_end < min_window_end) {
+                            mask_type = MaskType::TRIU_MASK;
+                            diagonal_offset = min_window_end - k_tile_start;
+                        } else if ((int32_t)k_tile_start >= max_window_start) {
+                            mask_type = MaskType::TRIL_MASK;
+                            diagonal_offset = k_tile_start - min_window_start;
+                        } else {
+                            ASSERT(
+                                "We shouldn't end up here, something is wrong with the sliding window bounds logic.");
+                        }
+                    }
                 }
             } else {
-                if (inf_tile_idx == -1) {
-                    fill_neginf_tile_bfp4<tile_bytes>(cb_mask_in, in_mask_tile_id);
-                    inf_tile_idx = in_mask_tile_id;
+                // No sliding window
+                if (is_causal) {
+                    if (global_k_tile < global_q_tile) {
+                        mask_type = MaskType::FULLY_ALLOWED;
+                    } else if (global_k_tile == global_q_tile) {
+                        mask_type = MaskType::TRIU_MASK;
+                    } else {
+                        mask_type = MaskType::FULLY_MASKED;
+                    }
                 } else {
-                    copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, inf_tile_idx, in_mask_tile_id);
+                    mask_type = MaskType::FULLY_ALLOWED;
                 }
+            }
+
+            // Apply the appropriate masking
+            switch (mask_type) {
+                case MaskType::FULLY_ALLOWED:
+                    if (zero_tile_idx == -1) {
+                        fill_tile_zeros<tile_bytes>(cb_mask_in, in_mask_tile_id);
+                        zero_tile_idx = in_mask_tile_id;
+                    } else {
+                        copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, zero_tile_idx, in_mask_tile_id);
+                    }
+                    break;
+                case MaskType::FULLY_MASKED:
+                    if (inf_tile_idx == -1) {
+                        fill_neginf_tile_bfp4<tile_bytes>(cb_mask_in, in_mask_tile_id);
+                        inf_tile_idx = in_mask_tile_id;
+                    } else {
+                        copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, inf_tile_idx, in_mask_tile_id);
+                    }
+                    break;
+                case MaskType::TRIU_MASK:
+                    // Causal (or leading sliding window) diagonal tile
+                    if (triu_diag_tile_idx == -1) {
+                        // Calculate diagonal offset based on tile positions
+                        int32_t diagonal_offset =
+                            (int32_t)(global_k_tile - global_q_tile) * (int32_t)tt::constants::TILE_HEIGHT;
+                        mask_triu_tile_bfp4<tile_bytes>(cb_mask_in, in_mask_tile_id, diagonal_offset);
+                        triu_diag_tile_idx = in_mask_tile_id;
+                    } else {
+                        copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, triu_diag_tile_idx, in_mask_tile_id);
+                    }
+                    break;
+                case MaskType::TRIL_MASK:
+                    // Trailing sliding window diagonal tile
+                    if (tril_diag_tile_idx == -1) {
+                        // Calculate diagonal offset based on tile positions
+                        // For sliding window, the diagonal represents the boundary of the window
+                        int32_t diagonal_offset =
+                            (int32_t)(global_k_tile - global_q_tile) * (int32_t)tt::constants::TILE_HEIGHT;
+                        mask_tril_tile_bfp4<tile_bytes>(cb_mask_in, in_mask_tile_id, diagonal_offset);
+                        tril_diag_tile_idx = in_mask_tile_id;
+                    } else {
+                        copy_tile<tile_bytes>(noc_write_addr_base, write_ptr_base, tril_diag_tile_idx, in_mask_tile_id);
+                    }
+                    break;
             }
         }
     }
