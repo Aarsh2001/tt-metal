@@ -28,9 +28,7 @@ namespace {
 inline bool is_fabric_2d() {
     const auto fabric_config = tt::tt_fabric::GetFabricConfig();
 
-    return (
-        fabric_config == tt::tt_fabric::FabricConfig::FABRIC_2D ||
-        fabric_config == tt::tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC);
+    return (fabric_config == tt::tt_fabric::FabricConfig::FABRIC_2D);
 }
 }  // namespace
 

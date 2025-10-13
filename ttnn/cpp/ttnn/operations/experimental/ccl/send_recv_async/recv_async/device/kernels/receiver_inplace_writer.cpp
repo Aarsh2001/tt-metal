@@ -28,6 +28,9 @@ void kernel_main() {
     ///////////////////////////////////////////////////
     // ARGS
     ///////////////////////////////////////////////////
+    DPRINT << "kernel_main on inplace writer num_pages_per_packet:" << num_pages_per_packet
+           << ", num_whole_packets:" << num_whole_packets << ", num_pages_remainder:" << num_pages_remainder
+           << ", num_pages:" << num_pages << "\n";
 
     // Setup Fabric Headers and Connections
     size_t rt_args_idx = 0;
@@ -67,6 +70,7 @@ void kernel_main() {
             noc_async_writes_flushed();
             fabric_socket_notify_sender(receiver_socket, fabric_connection, socket_packet_header_addr);
         }
+        DPRINT << " write whole packets (inplace)\n";
 
         if (num_pages_remainder > 0) {
             socket_wait_for_pages(receiver_socket, 1);

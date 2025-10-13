@@ -45,6 +45,10 @@ void kernel_main() {
     ///////////////////////////////////////////////////
     // ARGS
     ///////////////////////////////////////////////////
+    DPRINT << "kernel_main on writer num_pages_per_packet:" << num_pages_per_packet
+           << ", num_whole_packets:" << num_whole_packets << ", num_pages_remainder:" << num_pages_remainder
+           << ", num_pages:" << num_pages << "\n";
+
     // Setup Fabric Headers and Connections
     size_t rt_args_idx = 0;
     uint32_t socket_config_addr = get_arg_val<uint32_t>(rt_args_idx++);
@@ -86,6 +90,7 @@ void kernel_main() {
             socket_push_pages(sender_socket, 1);
             fabric_socket_notify_receiver(sender_socket, fabric_connection, socket_packet_header_addr);
         }
+        DPRINT << " write whole packets\n";
 
         if constexpr (num_pages_remainder > 0) {
             socket_reserve_pages(sender_socket, 1);

@@ -29,6 +29,9 @@ void kernel_main() {
     ///////////////////////////////////////////////////
     // ARGS
     ///////////////////////////////////////////////////
+    DPRINT << "kernel_main on reader num_pages_per_packet:" << num_pages_per_packet
+           << ", num_whole_packets:" << num_whole_packets << ", num_pages_remainder:" << num_pages_remainder
+           << ", num_pages:" << num_pages << "\n";
 
     uint32_t input_base_addr = get_arg_val<uint32_t>(0);
 
@@ -48,10 +51,12 @@ void kernel_main() {
                 noc_async_read<input_page_size>(noc_read_addr, l1_write_addr, input_page_size);
                 page_index++;
                 l1_write_addr += socket_page_size;
+                // DPRINT << " read one page\n";
             }
             noc_async_read_barrier();
             cb_push_back(cb0_id, 1);
         }
+        DPRINT << " read whole packets\n";
 
         if constexpr (num_pages_remainder > 0) {
             cb_reserve_back(cb0_id, 1);

@@ -31,6 +31,7 @@
 #include "tt_metal/hw/inc/utils/utils.h"
 #include "tt_metal/fabric/hw/inc/edm_fabric/fabric_txq_setup.h"
 #include "hostdevcommon/fabric_common.h"
+#include "tt_metal/fabric/hw/inc/tt_fabric_api.h"
 
 #include <array>
 #include <cstddef>
@@ -1481,6 +1482,146 @@ void run_receiver_channel_step_impl(
 #if defined(FABRIC_2D)
             // need this ifdef since the packet header for 1D does not have router_buffer field in it.
             hop_cmd = packet_header->route_buffer[cached_routing_fields.hop_index];
+
+            auto prev_cmd = hop_cmd;
+            const auto* routing_table =
+                reinterpret_cast<tt_l1_ptr tt::tt_fabric::tensix_routing_l1_info_t*>(ROUTING_TABLE_BASE);
+
+            auto direction_to_fwd_cmd = [&](eth_chan_directions dir) {
+                // DPRINT << "fwd "
+                //         << "(m:" << (int)routing_table->my_mesh_id << ",c:" << routing_table->my_device_id
+                //         << ") to (m:" << (int)packet_header->dst_start_mesh_id << ",c:" <<
+                //         (int)packet_header->dst_start_chip_id
+                //         << ") h_idx:" << (int)packet_header->routing_fields.hop_index
+                //         << " m_d:" << (int)my_direction
+                //         << " n_d:" << (int)dir
+                //         << " buf:[" << (int)packet_header->route_buffer[0]
+                //          << "," << (int)packet_header->route_buffer[1]
+                //          << "," << (int)packet_header->route_buffer[2]
+                //      << "]\n";
+                switch (dir) {
+                    case eth_chan_directions::EAST: return LowLatencyMeshRoutingFields::FORWARD_EAST;
+                    case eth_chan_directions::WEST: return LowLatencyMeshRoutingFields::FORWARD_WEST;
+                    case eth_chan_directions::NORTH: return LowLatencyMeshRoutingFields::FORWARD_NORTH;
+                    case eth_chan_directions::SOUTH: return LowLatencyMeshRoutingFields::FORWARD_SOUTH;
+                    default: ASSERT(false); return LowLatencyMeshRoutingFields::NOOP;
+                }
+            };
+
+            auto recompute_path = [&]() {
+                // fabric_set_unicast_route<static_cast<eth_chan_directions>(my_direction)>(packet_header,
+                // packet_header->dst_start_chip_id, packet_header->dst_start_mesh_id);
+                fabric_set_unicast_route<true>(
+                    packet_header, packet_header->dst_start_chip_id, packet_header->dst_start_mesh_id);
+                cached_routing_fields.hop_index = 0;
+                packet_header->routing_fields.hop_index = 0;
+                return packet_header->route_buffer[0];
+            };
+
+            if (packet_header->dst_start_mesh_id != routing_table->my_mesh_id) {
+                // DPRINT << "Route hop_index:" << cached_routing_fields.hop_index
+                //     << " my_mesh_id:" << (int)routing_table->my_mesh_id << ", my_device_id:" <<
+                //     (int)routing_table->my_device_id
+                //     << ", dst_mesh_id:" << (int)packet_header->dst_start_mesh_id << ", dst_device_id:" <<
+                //     (int)packet_header->dst_start_chip_id
+                //     << "\n";
+                eth_chan_directions next_direction =
+                    get_next_hop_router_direction(packet_header->dst_start_mesh_id, packet_header->dst_start_chip_id);
+                if constexpr (my_direction == EAST) {  // arrive at exit node. Convert from local drain to forward to
+                                                       // next mesh
+                    if (hop_cmd == LowLatencyMeshRoutingFields::FORWARD_EAST ||
+                        (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index == 0)) {
+                        // Case 1: Packet forwarding east and arrived at east-facing exit node
+                        // Case 2: Worker on exit node sent inter-mesh packet (route_buffer[0] = NOOP, hop_index = 0)
+                        hop_cmd = direction_to_fwd_cmd(next_direction);
+                    }
+                    // else if (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index != 0) {
+                    //     // Packet crossed inter-mesh link and arrived at a new mesh (not target yet), recompute path
+                    //     hop_cmd = recompute_path();
+                    // }
+                } else if constexpr (my_direction == WEST) {
+                    if (hop_cmd == LowLatencyMeshRoutingFields::FORWARD_WEST ||
+                        (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index == 0)) {
+                        // Case 1: Packet forwarding west and arrived at west-facing exit node
+                        // Case 2: Worker on exit node sent inter-mesh packet (route_buffer[0] = NOOP, hop_index = 0)
+                        hop_cmd = direction_to_fwd_cmd(next_direction);
+                    }
+                    // else if (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index != 0) {
+                    //     // Packet crossed inter-mesh link and arrived at a new mesh (not target yet), recompute path
+                    //     hop_cmd = recompute_path();
+                    // }
+                } else if constexpr (my_direction == NORTH) {
+                    if (hop_cmd == LowLatencyMeshRoutingFields::FORWARD_NORTH ||
+                        (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index == 0)) {
+                        // Case 1: Packet forwarding north and arrived at north-facing exit node
+                        // Case 2: Worker on exit node sent inter-mesh packet (route_buffer[0] = NOOP, hop_index = 0)
+                        hop_cmd = direction_to_fwd_cmd(next_direction);
+                    }
+                    // else if (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index != 0) {
+                    //     // Packet crossed inter-mesh link and arrived at a new mesh (not target yet), recompute path
+                    //     hop_cmd = recompute_path();
+                    // }
+                } else if constexpr (my_direction == SOUTH) {
+                    if (hop_cmd == LowLatencyMeshRoutingFields::FORWARD_SOUTH ||
+                        (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index == 0)) {
+                        // Case 1: Packet forwarding south and arrived at south-facing exit node
+                        // Case 2: Worker on exit node sent inter-mesh packet (route_buffer[0] = NOOP, hop_index = 0)
+                        hop_cmd = direction_to_fwd_cmd(next_direction);
+                    }
+                    // else if (hop_cmd == LowLatencyMeshRoutingFields::NOOP && cached_routing_fields.hop_index != 0) {
+                    //     // Packet crossed inter-mesh link and arrived at a new mesh (not target yet), recompute path
+                    //     hop_cmd = recompute_path();
+                    // }
+                } else {
+                    ASSERT(false);
+                }
+                // DPRINT << "Arrive at exit node"
+                //     << "(mesh:" << (int)routing_table->my_mesh_id << ", chip:" << routing_table->my_device_id
+                //     << ") to (mesh:" << (int)packet_header->dst_start_mesh_id << ", chip:" <<
+                //     (int)packet_header->dst_start_chip_id
+                //     << ") hop_index:" << (int)packet_header->routing_fields.hop_index
+                //     << " from " << (int)my_direction
+                //     << " hop_cmd:" << (int)hop_cmd
+                //     << "\n";
+            } else {
+                // if (hop_cmd == LowLatencyMeshRoutingFields::NOOP) {
+                //     hop_cmd = recompute_path();
+                // }
+                if (hop_cmd == LowLatencyMeshRoutingFields::NOOP &&
+                    cached_routing_fields.hop_index == 0) {  // from chip 1 or 3?
+                    hop_cmd = recompute_path();
+                    // DPRINT << "0 r_path"
+                    //         << "(m:" << (int)routing_table->my_mesh_id << ",c:" << routing_table->my_device_id
+                    //         << ") to (m:" << (int)packet_header->dst_start_mesh_id << ",c:" <<
+                    //         (int)packet_header->dst_start_chip_id
+                    //         << ") h_idx:" << (int)packet_header->routing_fields.hop_index
+                    //         << " me:" << (int)my_direction
+                    //         << " buf:[" << (int)packet_header->route_buffer[0]
+                    //         << "," << (int)packet_header->route_buffer[1]
+                    //         << "," << (int)packet_header->route_buffer[2]
+                    //         << "]\n";
+                } else if (
+                    hop_cmd == LowLatencyMeshRoutingFields::NOOP &&
+                    cached_routing_fields.hop_index != 0) {  // from chip 0 or 2? arrived at target mesh
+                    hop_cmd = recompute_path();
+                    if (hop_cmd == LowLatencyMeshRoutingFields::NOOP) {
+                        hop_cmd = packet_header->route_buffer[0] =
+                            direction_to_fwd_cmd((eth_chan_directions)my_direction);
+                    }
+
+                    // DPRINT << "1 r_path"
+                    //         << "(m:" << (int)routing_table->my_mesh_id << ",c:" << routing_table->my_device_id
+                    //         << ") to (m:" << (int)packet_header->dst_start_mesh_id << ",c:" <<
+                    //         (int)packet_header->dst_start_chip_id
+                    //         << ") h_idx:" << (int)packet_header->routing_fields.hop_index
+                    //         << " me:" << (int)my_direction
+                    //         << " buf:[" << (int)packet_header->route_buffer[0]
+                    //         << "," << (int)packet_header->route_buffer[1]
+                    //         << "," << (int)packet_header->route_buffer[2]
+                    //         << "]\n";
+                }
+            }
+
             can_send_to_all_local_chip_receivers = can_forward_packet_completely<receiver_channel, DOWNSTREAM_SENDER_NUM_BUFFERS_VC0, DOWNSTREAM_SENDER_NUM_BUFFERS_VC1>(
                 hop_cmd, downstream_edm_interfaces_vc0, downstream_edm_interface_vc1);
 #endif
