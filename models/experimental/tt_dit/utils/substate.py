@@ -13,14 +13,14 @@ if TYPE_CHECKING:
     import torch
 
 
-def substate(state: dict[str, torch.Tensor], key: str) -> dict[str, torch.Tensor]:
+def substate(state: Mapping[str, torch.Tensor], key: str) -> dict[str, torch.Tensor]:
     prefix = f"{key}."
     prefix_len = len(prefix)
 
     return {k[prefix_len:]: v for k, v in state.items() if k.startswith(prefix)}
 
 
-def has_substate(state: dict[str, torch.Tensor], key: str) -> bool:
+def has_substate(state: Mapping[str, torch.Tensor], key: str) -> bool:
     prefix = f"{key}."
 
     return any(k.startswith(prefix) for k in state)
