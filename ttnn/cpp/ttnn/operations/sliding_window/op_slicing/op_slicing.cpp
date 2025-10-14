@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "io_slicing.hpp"
+#include "op_slicing.hpp"
 #include "ttnn/operations/core/core.hpp"
 #include "ttnn/operations/data_movement/untilize/untilize.hpp"
 #include "ttnn/operations/functions.hpp"
@@ -12,27 +12,26 @@
 #include "ttnn/operations/experimental/slice_write/slice_write.hpp"
 #include "ttnn/operations/experimental/padded_slice/padded_slice.hpp"
 #include "ttnn/operations/conv/conv2d/conv2d.hpp"
-namespace ttnn::operations::slicing_ops {
+namespace ttnn::operations::op_slicing {
 
 void run_sliced_op(
     const ttnn::Tensor& input_tensor,
     ttnn::Tensor& output_tensor,
     OpSliceAttr* op_slice_attr,
-    ttnn::operations::conv::conv2d::Conv2dSliceConfig dram_slice_config) {
+    Op2DSliceConfig dram_slice_config) {
     tt::tt_metal::Layout output_layout = output_tensor.layout();
     auto [batch_size, output_height, output_width, output_channels] = output_tensor.logical_shape().to_array_4D();
     auto [in_batch_, input_height, input_width, input_channels] = input_tensor.logical_shape().to_array_4D();
 
     uint32_t slice_rounding_value = 1;
     if (output_layout == tt::tt_metal::Layout::TILE &&
-        dram_slice_config.slice_type == conv::conv2d::Conv2dSliceConfig::SliceType::DRAM_WIDTH) {
+        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_WIDTH) {
         // In Conv2d DRAM with Outputs in Tile layout, we need to round the slice size to a multiple of TILE_HEIGHT.
         slice_rounding_value = tt::constants::TILE_HEIGHT;
     }
 
     const uint32_t output_sliced_dim =
-        dram_slice_config.slice_type == conv::conv2d::Conv2dSliceConfig::SliceType::DRAM_HEIGHT ? output_height
-                                                                                                : output_width;
+        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
     bool first_run = true;
     const uint32_t min_output_slice_size =
         tt::div_up(output_sliced_dim, slice_rounding_value) / dram_slice_config.num_slices;
@@ -54,7 +53,7 @@ void run_sliced_op(
 
         uint32_t output_slice_height_start, output_slice_height_end, input_slice_height_start, input_slice_height_end;
         uint32_t output_slice_width_start, output_slice_width_end, input_slice_width_start, input_slice_width_end;
-        if (dram_slice_config.slice_type == conv::conv2d::Conv2dSliceConfig::SliceType::DRAM_HEIGHT) {
+        if (dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT) {
             output_slice_height_start = output_slice_dim_start;
             output_slice_height_end = output_slice_dim_end;
             output_slice_width_start = 0;
@@ -97,7 +96,8 @@ void run_sliced_op(
 
         log_trace(
             tt::LogOp,
-            "Conv2d DRAM Slicing: Slice {}: Output Slice Start: ({}, {}), End: ({}, {})",
+            "Op {} DRAM Slicing: Slice {}: Output Slice Start: ({}, {}), End: ({}, {})",
+            op_slice_attr->name(),
             slice_index,
             output_slice_height_start,
             output_slice_width_start,
@@ -105,7 +105,8 @@ void run_sliced_op(
             output_slice_width_end);
         log_trace(
             tt::LogOp,
-            "Conv2d DRAM Slicing: Slice {}: Input Slice Start: ({}, {}), End: ({}, {})",
+            "Op {} DRAM Slicing: Slice {}: Input Slice Start: ({}, {}), End: ({}, {})",
+            op_slice_attr->name(),
             slice_index,
             input_slice_height_start,
             input_slice_width_start,
@@ -116,7 +117,7 @@ void run_sliced_op(
 
         uint32_t output_slice_width = output_slice_width_end - output_slice_width_start;
 
-        log_info(
+        log_debug(
             tt::LogOp,
             "Input Slice : {},{} ->  {},{}, Output Slice {} x {}",
             input_slice_height_start,
@@ -171,4 +172,4 @@ void run_sliced_op(
         slice_index++;
     }
 }
-}  // namespace ttnn::operations::slicing_ops
+}  // namespace ttnn::operations::op_slicing

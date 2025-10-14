@@ -94,7 +94,7 @@ ttnn::Tensor prepare_conv_weights(
     const std::optional<const DataType>& output_dtype,
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_);
+    const std::optional<const op_slicing::Op2DSliceConfig>& dram_slice_config_);
 
 ttnn::Tensor prepare_conv_bias(
     const ttnn::Tensor& bias_tensor,
@@ -115,7 +115,7 @@ ttnn::Tensor prepare_conv_bias(
     const std::optional<const DataType>& output_dtype,
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_ = std::nullopt);
+    const std::optional<const op_slicing::Op2DSliceConfig>& dram_slice_config_ = std::nullopt);
 
 // Unified parameter struct for conv2d weight and bias preparation
 struct Conv2dWeightsBiasPrepConfig {

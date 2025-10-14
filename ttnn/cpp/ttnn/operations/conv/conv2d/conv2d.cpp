@@ -39,8 +39,8 @@
 namespace ttnn {
 namespace operations::conv {
 using namespace tt;
+using op_slicing::Op2DSliceConfig;
 using sliding_window::SlidingWindowConfig;
-
 namespace conv2d {
 
 ResultWithOptions result_to_result_with_options(
@@ -77,11 +77,11 @@ ResultWithOptions conv2d(
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
     const std::optional<const MemoryConfig>& memory_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_,
+    const std::optional<const Op2DSliceConfig>& dram_slice_config_,
     bool return_output_dim,
     bool return_weights_and_bias) {
     if (dram_slice_config_.has_value()) {
-        if (dram_slice_config_.value().slice_type == Conv2dSliceConfig::SliceType::L1_FULL) {
+        if (dram_slice_config_.value().slice_type == Op2DSliceConfig::SliceType::L1_FULL) {
             log_trace(tt::LogOp, "Conv2d L1 with slice config {}", dram_slice_config_);
             return result_to_result_with_options(
                 conv2d_L1(
@@ -191,7 +191,7 @@ ResultWithOptions conv2d(
 // Calls conv2d_L1 to perform the convolution on the sliced input tensor.
 // Finally, it uses ttnn::experimental::slice_write to write the output tensor back to DRAM.
 // The function is called in a loop for each slice of the output tensor.
-// The Conv2dSliceConfig is used to determine the slicing configuration. The dimension along which it is sliced, and the
+// The Op2DSliceConfig is used to determine the slicing configuration. The dimension along which it is sliced, and the
 // number of such slices.
 // Conv2dConfig does not control the final output, but rather the conv2d_L1 function that is called internally.
 Result conv2d_DRAM(
@@ -213,7 +213,7 @@ Result conv2d_DRAM(
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
     const std::optional<const MemoryConfig>& memory_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_) {
+    const std::optional<const Op2DSliceConfig>& dram_slice_config_) {
     Conv2dConfig conv_config = conv_config_.value_or(Conv2dConfig());
     const DataType output_dtype = dtype.value_or(input_tensor.dtype());
     std::array<uint32_t, 4> padding_n4 = sliding_window::get_pair_n4_padding(padding);
@@ -318,7 +318,7 @@ Result conv2d_DRAM(
     if (!conv_config.weights_dtype.has_value()) {
         conv_config.weights_dtype = weight_tensor.dtype();
     }
-    Conv2dSliceConfig dram_slice_config;
+    Op2DSliceConfig dram_slice_config;
     std::tie(dram_slice_config, conv_config) = determine_conv2d_slice_config(
         dram_slice_config_,
         ConvDRAMParamters{
@@ -349,7 +349,7 @@ Result conv2d_DRAM(
     TT_FATAL(dram_slice_config.num_slices > 0, " Number of slices should be greater than 0 for Conv2D DRAM Slicing");
 
     const uint32_t output_sliced_dim =
-        dram_slice_config.slice_type == Conv2dSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
+        dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
 
     if (output_sliced_dim == 1) {
         dram_slice_config.num_slices = 1;
@@ -402,7 +402,7 @@ Result conv2d_DRAM(
         compute_config,
         device);
 
-    ttnn::operations::slicing_ops::run_sliced_op(
+    ttnn::operations::op_slicing::run_sliced_op(
         input_tensor_on_device, dram_output_tensor, &slice_attr, dram_slice_config);
 
     if (conv_config.deallocate_activation) {
@@ -763,7 +763,7 @@ ResultWithOptions Conv2dOperation::invoke(
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
     const std::optional<const MemoryConfig>& memory_config,
-    const std::optional<const Conv2dSliceConfig>& slice_config_,
+    const std::optional<const Op2DSliceConfig>& slice_config_,
     bool return_output_dim,
     bool return_weights_and_bias) {
     return conv2d(
@@ -923,6 +923,9 @@ tt::tt_metal::MemoryConfig Conv2dSliceAttr::get_input_memory_config(
         BufferType::DRAM));
     return sliced_input_tensor_memory_config;
 }
+
+std::string Conv2dSliceAttr::name() { return "Conv2D"; }
+
 ttnn::Tensor Conv2dSliceAttr::run_L1_op(
     const ttnn::Tensor& sliced_input_tensor, IOShape output_slice_start, IOShape output_slice_end) {
     auto [output_slice_height_start, output_slice_width_start] = output_slice_start;

@@ -94,8 +94,9 @@ Result conv1d(
             conv_config,
             compute_config,
             memory_config,
-            Conv2dSliceConfig{
-                .slice_type = Conv2dSliceConfig::SliceType::L1_FULL},  // Conv1D doesn't support DRAM Slicing. Only L1
+            op_slicing::Op2DSliceConfig{
+                .slice_type =
+                    op_slicing::Op2DSliceConfig::SliceType::L1_FULL},  // Conv1D doesn't support DRAM Slicing. Only L1
             true,
             true));
 

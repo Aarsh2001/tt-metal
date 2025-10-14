@@ -13,7 +13,7 @@
 #include "ttnn/operations/sliding_window/sliding_window.hpp"
 #include "ttnn/tensor/types.hpp"
 #include "ttnn/operations/eltwise/unary/common/unary_op_types.hpp"
-
+#include "ttnn/operations/sliding_window/op_slicing/op_slicing.hpp"
 namespace ttnn {
 
 namespace operations::conv {
@@ -273,8 +273,8 @@ uint32_t estimate_halo_output_elems(
     std::array<uint32_t, 2> dilation,
     std::array<uint32_t, 4> padding);
 
-std::pair<Conv2dSliceConfig, Conv2dConfig> determine_conv2d_slice_config(
-    std::optional<Conv2dSliceConfig> slice_config, const ConvDRAMParamters& params, MeshDevice* device);
+std::pair<op_slicing::Op2DSliceConfig, Conv2dConfig> determine_conv2d_slice_config(
+    std::optional<op_slicing::Op2DSliceConfig> slice_config, const ConvDRAMParamters& params, MeshDevice* device);
 
 void tilize_with_optional_deallocation(Tensor& input_tensor_on_device, bool deallocate);
 }  // namespace operations::conv

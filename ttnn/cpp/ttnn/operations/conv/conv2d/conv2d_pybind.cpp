@@ -19,6 +19,7 @@
 #include "ttnn/operations/conv/conv2d/conv2d_utils.hpp"
 #include "ttnn/operations/conv/conv2d/device/conv2d_op.hpp"
 #include "ttnn/operations/conv/conv2d/prepare_conv2d_weights.hpp"
+#include "ttnn/operations/sliding_window/op_slicing/op_slicing.hpp"
 #include "ttnn/operations/sliding_window/sliding_window_pybind.hpp"
 #include "ttnn/types.hpp"
 #include <tt-metalium/constants.hpp>
@@ -26,7 +27,7 @@
 #include "ttnn/operations/eltwise/unary/common/unary_op_utils.hpp"
 
 namespace ttnn::operations::conv::conv2d {
-
+using op_slicing::Op2DSliceConfig;
 void py_bind_conv2d(py::module& module) {
     bind_registered_operation(
         module,
@@ -85,7 +86,7 @@ void py_bind_conv2d(py::module& module) {
                const std::optional<const Conv2dConfig>& conv_config,
                const std::optional<const DeviceComputeKernelConfig>& compute_config,
                const std::optional<const MemoryConfig>& memory_config,
-               const std::optional<const Conv2dSliceConfig>& slice_config_,
+               const std::optional<const Op2DSliceConfig>& slice_config_,
                bool return_output_dim,
                bool return_weights_and_bias) -> ResultWithOptions {
                 return self(
@@ -255,9 +256,9 @@ void py_bind_conv2d(py::module& module) {
         py::arg("parallel_config"),
         py::arg("tile_size"));
 
-    auto py_conv_slice_config = py::class_<Conv2dSliceConfig>(
+    auto py_conv_slice_config = py::class_<Op2DSliceConfig>(
         module,
-        "Conv2dSliceConfig",
+        "Op2DSliceConfig",
         R"doc(
         | Conv2dSliceConfig is a structure that is used to configure how the input & output tensors of Conv2D are sliced when they are placed in DRAM. \
         | Conv2D only supports inputs in L1. If the input tensor or output tensor are too large to fit into L1, then the Conv2d_DRAM version can be used. \
@@ -265,15 +266,12 @@ void py_bind_conv2d(py::module& module) {
         | Conv2dSliceConfig determines how this slicing happens.
         )doc");
     py_conv_slice_config.def(
-        py::init<Conv2dSliceConfig::SliceType, uint32_t>(),
-        py::kw_only(),
-        py::arg("slice_type"),
-        py::arg("num_slices"));
-    py_conv_slice_config.def(py::init<Conv2dSliceConfig::SliceType>(), py::kw_only(), py::arg("slice_type"));
-    py_conv_slice_config.def("__repr__", [](const Conv2dSliceConfig& config) { return fmt::format("{}", config); });
+        py::init<Op2DSliceConfig::SliceType, uint32_t>(), py::kw_only(), py::arg("slice_type"), py::arg("num_slices"));
+    py_conv_slice_config.def(py::init<Op2DSliceConfig::SliceType>(), py::kw_only(), py::arg("slice_type"));
+    py_conv_slice_config.def("__repr__", [](const Op2DSliceConfig& config) { return fmt::format("{}", config); });
     py_conv_slice_config.def_readwrite(
         "slice_type",
-        &Conv2dSliceConfig::slice_type,
+        &Op2DSliceConfig::slice_type,
         R"doc(
         | The type of slice to be used. Can be either SliceHeight or SliceWidth. When the tensor is in [N, H, W, C] format, then it can slice either along the height or width dimension.
         | Slicing along the width is preferable as it reduces the size of the output of the Halo operation.
@@ -281,17 +279,17 @@ void py_bind_conv2d(py::module& module) {
         )doc");
     py_conv_slice_config.def_readwrite(
         "num_slices",
-        &Conv2dSliceConfig::num_slices,
+        &Op2DSliceConfig::num_slices,
         R"doc(
         | The number of slices that the input & output tensors are divided into.
         | The output tensor is divided into num_slices slices along the slice_type dimension.
         | The corresponding input tensor needed to calculate that output is determined and sliced.
         | If the size of the slice dimension is not divisible by num_slices, then the last slice will be smaller than the rest.
         )doc");
-    py::enum_<Conv2dSliceConfig::SliceType>(py_conv_slice_config, "SliceTypeEnum")
-        .value("L1Full", Conv2dSliceConfig::SliceType::L1_FULL)
-        .value("DRAMSliceHeight", Conv2dSliceConfig::SliceType::DRAM_HEIGHT)
-        .value("DRAMSliceWidth", Conv2dSliceConfig::SliceType::DRAM_WIDTH);
+    py::enum_<Op2DSliceConfig::SliceType>(py_conv_slice_config, "SliceTypeEnum")
+        .value("L1Full", Op2DSliceConfig::SliceType::L1_FULL)
+        .value("DRAMSliceHeight", Op2DSliceConfig::SliceType::DRAM_HEIGHT)
+        .value("DRAMSliceWidth", Op2DSliceConfig::SliceType::DRAM_WIDTH);
 
     auto py_conv_config = py::class_<Conv2dConfig>(
         module,

@@ -28,6 +28,7 @@
 namespace ttnn {
 namespace operations::conv {
 using namespace tt;
+using op_slicing::Op2DSliceConfig;
 using sliding_window::ParallelConfig;
 
 namespace conv2d {
@@ -1106,7 +1107,7 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
     const DeviceComputeKernelConfig& compute_config,
     DataType input_dtype,
     const std::optional<const DataType>& output_dtype,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_ = std::nullopt) {
+    const std::optional<const Op2DSliceConfig>& dram_slice_config_ = std::nullopt) {
     DataType conv_output_dtype = output_dtype.value_or(input_dtype);
 
     std::array<uint32_t, 4> padding_n4 = sliding_window::get_pair_n4_padding(padding);
@@ -1137,14 +1138,14 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
         calculate_output_image_size({input_height, input_width}, kernel_size, stride, padding_n4, dilation);
 
     bool is_dram_conv = (dram_slice_config_.has_value() &&
-                         dram_slice_config_.value().slice_type != Conv2dSliceConfig::SliceType::L1_FULL) ||
+                         dram_slice_config_.value().slice_type != Op2DSliceConfig::SliceType::L1_FULL) ||
                         (!dram_slice_config_.has_value() && !input_memory_config.is_l1());
 
     // Conv1D doesn't support DRAM
     is_dram_conv = is_dram_conv && !is_conv1d;
 
     if (is_dram_conv) {
-        Conv2dSliceConfig dram_slice_config;
+        Op2DSliceConfig dram_slice_config;
         std::tie(dram_slice_config, conv_config) = determine_conv2d_slice_config(
             dram_slice_config_,
             ConvDRAMParamters{
@@ -1199,13 +1200,13 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
         }
         uint32_t slice_rounding_value = 1;
         if (conv_config.output_layout == tt_metal::Layout::TILE &&
-            dram_slice_config.slice_type == Conv2dSliceConfig::SliceType::DRAM_WIDTH) {
+            dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_WIDTH) {
             // In Conv2d DRAM with Outputs in Tile layout, we need to round the slice size to a multiple of TILE_HEIGHT.
             slice_rounding_value = tt::constants::TILE_HEIGHT;
         }
 
         const uint32_t output_sliced_dim =
-            dram_slice_config.slice_type == Conv2dSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
+            dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT ? output_height : output_width;
 
         TT_FATAL(
             dram_slice_config.num_slices <= output_sliced_dim,
@@ -1217,7 +1218,7 @@ static Conv2dWeightsBiasPrepConfig setup_conv_prep_config(
             tt::div_up(tt::div_up(output_sliced_dim, slice_rounding_value), dram_slice_config.num_slices) *
             slice_rounding_value;
 
-        if (dram_slice_config.slice_type == Conv2dSliceConfig::SliceType::DRAM_HEIGHT) {
+        if (dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_HEIGHT) {
             output_height = min_output_slice_size;
             input_height =
                 ((output_height - 1) * stride[0]) + ((kernel_size[0] - 1) * (dilation[0] - 1)) + kernel_size[0];
@@ -1547,7 +1548,7 @@ ttnn::Tensor prepare_conv_weights(
     const std::optional<const DataType>& output_dtype,
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_) {
+    const std::optional<const Op2DSliceConfig>& dram_slice_config_) {
     if (weights_format != "OIHW") {
         log_warning(
             tt::LogOp,
@@ -1612,7 +1613,7 @@ ttnn::Tensor prepare_conv_bias(
     const std::optional<const DataType>& output_dtype,
     const std::optional<const Conv2dConfig>& conv_config_,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_) {
+    const std::optional<const Op2DSliceConfig>& dram_slice_config_) {
     TT_FATAL(!ttnn::has_storage_type_of(bias_tensor, ttnn::DEVICE_STORAGE_TYPE), "conv bias should be placed on host");
     Conv2dConfig conv_config = conv_config_.value_or(Conv2dConfig());
     DeviceComputeKernelConfig compute_config = compute_config_.value_or(get_conv_default_compute_kernel_config(device));

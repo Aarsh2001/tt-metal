@@ -18,7 +18,6 @@
 #include "ttnn/decorators.hpp"
 #include "ttnn/operations/conv/conv_types.hpp"
 #include "ttnn/operations/conv/conv2d/conv2d_utils.hpp"
-#include "ttnn/operations/conv/io_slicing/io_slicing.hpp"
 namespace ttnn {
 
 namespace operations::conv {
@@ -75,7 +74,7 @@ Result conv2d_DRAM(
     const std::optional<const Conv2dConfig>& conv_config_ = std::nullopt,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_ = std::nullopt,
     const std::optional<const MemoryConfig>& memory_config_ = std::nullopt,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_ = std::nullopt);
+    const std::optional<const op_slicing::Op2DSliceConfig>& dram_slice_config_ = std::nullopt);
 
 ResultWithOptions conv2d(
     const ttnn::Tensor& input_tensor,
@@ -96,7 +95,7 @@ ResultWithOptions conv2d(
     const std::optional<const Conv2dConfig>& conv_config_ = std::nullopt,
     const std::optional<const DeviceComputeKernelConfig>& compute_config_ = std::nullopt,
     const std::optional<const MemoryConfig>& memory_config_ = std::nullopt,
-    const std::optional<const Conv2dSliceConfig>& dram_slice_config_ = std::nullopt,
+    const std::optional<const op_slicing::Op2DSliceConfig>& dram_slice_config_ = std::nullopt,
     bool return_output_dim = false,
     bool return_weights_and_bias = false);
 
@@ -120,12 +119,12 @@ struct Conv2dOperation {
         const std::optional<const Conv2dConfig>& conv_config_ = std::nullopt,
         const std::optional<const DeviceComputeKernelConfig>& compute_config_ = std::nullopt,
         const std::optional<const MemoryConfig>& memory_config_ = std::nullopt,
-        const std::optional<const Conv2dSliceConfig>& dram_slice_config_ = std::nullopt,
+        const std::optional<const op_slicing::Op2DSliceConfig>& dram_slice_config_ = std::nullopt,
         bool return_output_dim = false,
         bool return_weights_and_bias = false);
 };
 
-class Conv2dSliceAttr : public ttnn::operations::slicing_ops::OpSliceAttr {
+class Conv2dSliceAttr : public ttnn::operations::op_slicing::OpSliceAttr {
     using OptionalRefTensor = std::optional<std::reference_wrapper<ttnn::Tensor>>;
     using RefTensor = std::reference_wrapper<ttnn::Tensor>;
 
@@ -171,6 +170,7 @@ public:
     tt::tt_metal::MemoryConfig get_input_memory_config(IOShape output_slice_start, IOShape output_slice_end) override;
     ttnn::Tensor run_L1_op(
         const ttnn::Tensor& sliced_input_tensor, IOShape output_slice_start, IOShape output_slice_end) override;
+    std::string name() override;
 };
 
 }  // namespace conv2d
