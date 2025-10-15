@@ -118,9 +118,10 @@ void kernel_main() {
                         // does_overlap = not (q_low >= k_high or k_low >= q_high)
                         // Due to loop bounds, we should never have k_low >= q_high. Can simplify this conditional check
                         // Read mask chunk
-                        if (!(q_low_idx >= k_high_idx)) {
-                            generate_mask<cb_mask_in>(
-                                Sq_chunk_t, Sk_chunk_t, offset_q_chunk, k_chunk, is_causal, sliding_window_size);
+                        if (!(q_low_idx >= k_high_idx) || sliding_window_size > 0) {
+                            // If no sliding window, only generate mask along diagonal
+                            // Otherwise, generate mask for all chunks
+                            generate_mask<cb_mask_in>(Sq_chunk_t, Sk_chunk_t, offset_q_chunk, k_chunk, is_causal, 0);
                         }
                     }
                 } else if constexpr (use_padded_mask) {
