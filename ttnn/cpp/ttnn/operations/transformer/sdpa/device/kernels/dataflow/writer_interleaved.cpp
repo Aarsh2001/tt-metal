@@ -121,7 +121,8 @@ void kernel_main() {
                         if (!(q_low_idx >= k_high_idx) || sliding_window_size > 0) {
                             // If no sliding window, only generate mask along diagonal
                             // Otherwise, generate mask for all chunks
-                            generate_mask<cb_mask_in>(Sq_chunk_t, Sk_chunk_t, offset_q_chunk, k_chunk, is_causal, 0);
+                            generate_mask<cb_mask_in>(
+                                Sq_chunk_t, Sk_chunk_t, offset_q_chunk, k_chunk, is_causal, sliding_window_size);
                         }
                     }
                 } else if constexpr (use_padded_mask) {
