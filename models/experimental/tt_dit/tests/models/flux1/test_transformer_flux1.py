@@ -50,6 +50,7 @@ def test_single_transformer_block(
     prompt_seq_len: int,
     spatial_seq_len: int,
     id: str,
+    is_ci_env: bool,
 ) -> None:
     submesh_device = mesh_device.create_submesh(ttnn.MeshShape(*submesh_shape))
     sp_factor = tuple(submesh_device.shape)[sp_axis]
@@ -117,22 +118,23 @@ def test_single_transformer_block(
             image_rotary_emb=(rope_cos, rope_sin),
         )
 
-    try:
-        from tracy import signpost
+    if not is_ci_env:
+        try:
+            from tracy import signpost
 
-        signpost("caching")
-        tt_spatial_out, tt_prompt_out = tt_model.forward(
-            spatial=tt_spatial,
-            prompt=tt_prompt,
-            time_embed=tt_time_embed,
-            spatial_rope=(tt_spatial_rope_cos, tt_spatial_rope_sin),
-            prompt_rope=(tt_prompt_rope_cos, tt_prompt_rope_sin),
-            spatial_sequence_length=spatial_seq_len,
-        )
+            signpost("caching")
+            tt_spatial_out, tt_prompt_out = tt_model.forward(
+                spatial=tt_spatial,
+                prompt=tt_prompt,
+                time_embed=tt_time_embed,
+                spatial_rope=(tt_spatial_rope_cos, tt_spatial_rope_sin),
+                prompt_rope=(tt_prompt_rope_cos, tt_prompt_rope_sin),
+                spatial_sequence_length=spatial_seq_len,
+            )
 
-        signpost("performance")
-    except ImportError:
-        logger.info("Tracy profiler not available, continuing without profiling")
+            signpost("performance")
+        except ImportError:
+            logger.info("Tracy profiler not available, continuing without profiling")
 
     itr = 1
     start = time()

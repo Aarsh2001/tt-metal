@@ -391,32 +391,10 @@ run_t3000_sd35large_tests() {
 
 run_t3000_flux1_tests() {
   run_t3000_dit_tests \
-    "models/experimental/tt_dit/tests/models/flux1/test_attention_flux1.py" \
+    "models/experimental/tt_dit/tests/blocks/test_attention.py::test_attention_flux" \
     "models/experimental/tt_dit/tests/models/flux1/test_transformer_flux1.py::test_single_transformer_block" \
-    "models/experimental/tt_dit/tests/models/flux1/test_transformer_flux1.py::test_transformer_block"
+    "models/experimental/tt_dit/tests/blocks/test_transformer_block.py::test_transformer_block_flux"
 }
-
-run_t3000_sd35large_tests_() {
-  # Record the start time
-  fail=0
-  start_time=$(date +%s)
-
-  echo "LOG_METAL: Running run_t3000_sd35large_tests"
-
-  # Run test_model for sd35 large
-  pytest -n auto models/experimental/tt_dit/tests/models/test_vae_sd35.py -k "t3k"; fail+=$?
-  pytest -n auto models/experimental/tt_dit/tests/models/test_attention_sd35.py; fail+=$?
-  pytest -n auto models/experimental/tt_dit/tests/models/test_transformer_sd35.py::test_sd35_transformer_block; fail+=$?
-
-  # Record the end time
-  end_time=$(date +%s)
-  duration=$((end_time - start_time))
-  echo "LOG_METAL: run_t3000_sd35large_tests $duration seconds to complete"
-  if [[ $fail -ne 0 ]]; then
-    exit 1
-  fi
-}
-
 
 run_t3000_tests() {
   # Run ethernet tests

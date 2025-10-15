@@ -48,6 +48,7 @@ def test_transformer_block_flux(
     spatial_seq_len: int,
     prompt_seq_len: int,
     mesh_id: str,
+    is_ci_env: bool,
 ) -> None:
     torch.manual_seed(0)
 
@@ -116,22 +117,23 @@ def test_transformer_block_flux(
             spatial, prompt, temb=time_embed, image_rotary_emb=(rope_cos, rope_sin)
         )
 
-    try:
-        from tracy import signpost
+    if not is_ci_env:
+        try:
+            from tracy import signpost
 
-        signpost("caching")
-        tt_spatial_out, tt_prompt_out = tt_model.forward(
-            tt_spatial,
-            tt_prompt,
-            tt_time_embed,
-            spatial_sequence_length=spatial_seq_len,
-            spatial_rope=(tt_spatial_rope_cos, tt_spatial_rope_sin),
-            prompt_rope=(tt_prompt_rope_cos, tt_prompt_rope_sin),
-        )
+            signpost("caching")
+            tt_spatial_out, tt_prompt_out = tt_model.forward(
+                tt_spatial,
+                tt_prompt,
+                tt_time_embed,
+                spatial_sequence_length=spatial_seq_len,
+                spatial_rope=(tt_spatial_rope_cos, tt_spatial_rope_sin),
+                prompt_rope=(tt_prompt_rope_cos, tt_prompt_rope_sin),
+            )
 
-        signpost("performance")
-    except ImportError:
-        logger.info("Tracy profiler not available, continuing without profiling")
+            signpost("performance")
+        except ImportError:
+            logger.info("Tracy profiler not available, continuing without profiling")
 
     itr = 1
     start = time()
