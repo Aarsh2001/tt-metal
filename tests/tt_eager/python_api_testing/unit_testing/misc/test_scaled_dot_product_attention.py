@@ -1133,7 +1133,7 @@ def run_test_sdpa_sliding_window(
         tt_K,
         tt_V,
         is_causal=is_causal,
-        sliding_window=sliding_window,
+        sliding_window_size=sliding_window,
         program_config=program_config,
         compute_kernel_config=compute_kernel_config,
     )
@@ -1176,6 +1176,7 @@ def run_test_sdpa_sliding_window(
         [1, 8, 1, 2048, 128, 128],  # Longer sequence
         [2, 8, 1, 512, 128, 64],  # Batch size > 1
         [1, 16, 2, 1024, 128, 128],  # GQA with sliding window
+        [1, 4, 2, 32 * 1024, 128, 1024],  # gemma
     ],
 )
 def test_sdpa_sliding_window(device, b, nh, nkv, s, d, dtype, q_chunk_size, k_chunk_size, sliding_window):
