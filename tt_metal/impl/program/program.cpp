@@ -176,17 +176,17 @@ void GenerateBinaries(IDevice* device, JitBuildOptions& build_options, const std
 #include <fstream>
 #endif
 
-size_t KernelCompileHash(const std::shared_ptr<Kernel>& kernel, JitBuildOptions& build_options, uint32_t build_key) {
-    // Store the build key into the KernelCompile hash. This will be unique per command queue
-    // configuration (necessary for dispatch kernels).
-    // Also account for watcher/dprint enabled in hash because they enable additional code to
+size_t KernelCompileHash(const std::shared_ptr<Kernel>& kernel, JitBuildOptions& build_options, tt::ARCH arch) {
+    // Account for watcher/dprint enabled in hash because they enable additional code to
     // be compiled into the kernel.
+    // Account for architecture in hash because binaries are different for different architectures, but
+    // the same for different devices of the same architecture.
     std::string compile_hash_str = fmt::format(
         "{}_{}_{}_{}",
-        build_key,
         std::to_string(std::hash<tt_hlk_desc>{}(build_options.hlk_desc)),
         kernel->compute_hash(),
-        tt::tt_metal::MetalContext::instance().rtoptions().get_compile_hash_string());
+        tt::tt_metal::MetalContext::instance().rtoptions().get_compile_hash_string(),
+        arch);
     size_t compile_hash = std::hash<std::string>{}(compile_hash_str);
 
 #ifdef GENERATE_HASH_LOG
@@ -194,8 +194,8 @@ size_t KernelCompileHash(const std::shared_ptr<Kernel>& kernel, JitBuildOptions&
     static std::mutex mutex_;
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        f << kernel->name() << " :: " << build_key << "::" << std::hash<tt_hlk_desc>{}(build_options.hlk_desc)
-          << " :: " << kernel->compute_hash() << " :: " << compile_hash_str << " " << compile_hash << std::endl
+        f << kernel->name() << "::" << std::hash<tt_hlk_desc>{}(build_options.hlk_desc)
+          << " :: " << kernel->compute_hash() << "::" << arch << " :: " << compile_hash_str << " " << compile_hash << std::endl
           << std::flush;
     }
 #endif
@@ -1416,7 +1416,7 @@ void detail::ProgramImpl::compile(IDevice* device, bool force_slow_dispatch) {
                     this->set_cb_data_fmt(kernel->logical_coreranges(), build_options);
                     this->set_cb_tile_dims(kernel->logical_coreranges(), build_options);
 
-                    auto kernel_hash = KernelCompileHash(kernel, build_options, build_env.build_key);
+                    auto kernel_hash = KernelCompileHash(kernel, build_options, device->arch());
 
                     const std::string kernel_path_suffix = kernel->name() + "/" + std::to_string(kernel_hash) + "/";
                     kernel->set_full_name(kernel_path_suffix);
