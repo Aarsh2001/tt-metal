@@ -93,7 +93,7 @@ def test_single_transformer_block(
         parallel_config=parallel_config,
         padding_config=padding_config,
     )
-    tt_model.load_state_dict(torch_model.state_dict())
+    tt_model.load_torch_state_dict(torch_model.state_dict())
 
     torch.manual_seed(0)
     combined = torch.randn([batch_size, prompt_seq_len + spatial_seq_len, inner_dim])
@@ -260,7 +260,7 @@ def test_transformer(
         logger.info(
             "Loading transformer weights from PyTorch state dict. To use cache, set TT_DIT_CACHE_DIR environment variable."
         )
-        tt_model.load_state_dict(torch_model.state_dict())
+        tt_model.load_torch_state_dict(torch_model.state_dict())
 
     torch.manual_seed(0)
     spatial = torch.randn([batch_size, spatial_seq_len, in_channels])
