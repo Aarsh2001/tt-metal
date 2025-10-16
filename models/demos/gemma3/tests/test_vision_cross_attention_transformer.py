@@ -4,14 +4,16 @@
 
 import os
 
-import pytest
 import torch
 from loguru import logger
 
+import pytest
 import ttnn
 from models.common.utility_functions import comp_allclose, comp_pcc
 from models.demos.gemma3.tt.gemma_vision_model import TtGemmaTransformerVision
 from models.demos.gemma3.tt.model_config import ModelArgs
+from models.perf.benchmarking_utils import BenchmarkData, BenchmarkProfiler
+from models.perf.device_perf_utils import run_device_perf
 from models.tt_transformers.tt.ccl import TT_CCL
 
 
@@ -84,6 +86,22 @@ def test_gemma_vision(
     logger.info(f"PCC: {pcc_message}")
 
     assert passing, f"PCC value is lower than {pcc_required} for some of the outputs. Check Warnings!"
+    # proba()
+
+
+def test_proba():
+    profiler = BenchmarkProfiler()
+    benchmark_data = BenchmarkData()
+    batch_size = 1
+    subdir = f"models/demos/gemma3/tests/"
+    num_iterations = 1
+    command = f"pytest models/demos/gemma3/tests/test_vision_cross_attention_transformer.py"
+    cols = ["DEVICE FW", "DEVICE KERNEL", "DEVICE BRISC KERNEL"]
+    profiler.start("run")
+    profiler.start("PROFILLING OP TO OP")
+    post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=True)
+    profiler.end("PROFILLING OP TO OP")
+    profiler.end("run")
 
 
 def get_image_features(vision_tower, projector, input_tensor):

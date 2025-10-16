@@ -5,14 +5,15 @@
 import json
 import os
 
-import pytest
 import torch
 from loguru import logger
 
+import pytest
 import ttnn
 from models.demos.gemma3.tt.gemma_vision_model import TtGemmaTransformerVision
-from models.demos.gemma3.tt.model_config import ModelArgs, determine_device_name
-from models.perf.benchmarking_utils import BenchmarkProfiler
+from models.demos.gemma3.tt.model_config import ModelArgs
+from models.perf.benchmarking_utils import BenchmarkData, BenchmarkProfiler
+from models.perf.device_perf_utils import run_device_perf
 from models.tt_transformers.tt.ccl import TT_CCL
 
 THRESHOLD_PERCENT = 5
@@ -32,44 +33,61 @@ TARGETS_JSON_FILENAME = (
 @pytest.mark.parametrize("batch_size", [1])
 @pytest.mark.parametrize("nr_forward_iterations", [15])
 def test_perf_gemma_vision(mesh_device, batch_size, nr_forward_iterations):
+    # profiler = BenchmarkProfiler()
+
+    # logger.info("Started profiling")
+    # profiler.start("total_run")
+    # run_model(
+    #     mesh_device=mesh_device,
+    #     batch_size=batch_size,
+    #     profiler=profiler,
+    #     nr_forward_iterations=nr_forward_iterations,
+    # )
+    # profiler.end("total_run")
+    # logger.info("Ended profiling")
+
+    # inference_measurements = [profiler.get_duration("model_forward_inference", i) for i in range(nr_forward_iterations)]
+    # inference_mean = sum(inference_measurements) / len(inference_measurements)
+
+    # measurement_keys = {k for _, k in profiler.start_times.keys()}
+
+    # measurements = dict()
+    # for k in measurement_keys:
+    #     measurements[k] = profiler.get_duration(k) if k != "model_forward_inference" else inference_mean
+    #     logger.info(f"measurement {k}: {measurements[k]}")
+
+    # targets = load_targets(
+    #     TARGETS_JSON_FILENAME,
+    #     device_type=determine_device_name(mesh_device),
+    # )
+
+    # if SAVE_NEW_PERF_TARGETS:
+    #     helper_write_to_json(
+    #         determine_device_name(mesh_device),
+    #         measurements["model_forward_inference"],
+    #         output_filename=TARGETS_JSON_FILENAME,
+    #     )
+
+    # upper_threshold = targets["model_forward_inference"] * (1 + THRESHOLD_PERCENT / 100)
+    # lower_threshold = targets["model_forward_inference"] * (1 - THRESHOLD_PERCENT / 100)
+    # assert lower_threshold < inference_mean < upper_threshold
+
+    proba()
+
+
+def proba():
     profiler = BenchmarkProfiler()
-
-    logger.info("Started profiling")
-    profiler.start("total_run")
-    run_model(
-        mesh_device=mesh_device,
-        batch_size=batch_size,
-        profiler=profiler,
-        nr_forward_iterations=nr_forward_iterations,
-    )
-    profiler.end("total_run")
-    logger.info("Ended profiling")
-
-    inference_measurements = [profiler.get_duration("model_forward_inference", i) for i in range(nr_forward_iterations)]
-    inference_mean = sum(inference_measurements) / len(inference_measurements)
-
-    measurement_keys = {k for _, k in profiler.start_times.keys()}
-
-    measurements = dict()
-    for k in measurement_keys:
-        measurements[k] = profiler.get_duration(k) if k != "model_forward_inference" else inference_mean
-        logger.info(f"measurement {k}: {measurements[k]}")
-
-    targets = load_targets(
-        TARGETS_JSON_FILENAME,
-        device_type=determine_device_name(mesh_device),
-    )
-
-    if SAVE_NEW_PERF_TARGETS:
-        helper_write_to_json(
-            determine_device_name(mesh_device),
-            measurements["model_forward_inference"],
-            output_filename=TARGETS_JSON_FILENAME,
-        )
-
-    upper_threshold = targets["model_forward_inference"] * (1 + THRESHOLD_PERCENT / 100)
-    lower_threshold = targets["model_forward_inference"] * (1 - THRESHOLD_PERCENT / 100)
-    assert lower_threshold < inference_mean < upper_threshold
+    benchmark_data = BenchmarkData()
+    batch_size = 1
+    subdir = f"tg-llama-prefill-device-{2}-perf-{2}"
+    num_iterations = 1
+    command = f"pytest models/demos/gemma3/tests/test_vision_cross_attention_transformer.py"
+    cols = ["DEVICE FW", "DEVICE KERNEL", "DEVICE BRISC KERNEL"]
+    profiler.start("run")
+    profiler.start("PROFILLING OP TO OP")
+    post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=True)
+    profiler.end("PROFILLING OP TO OP")
+    profiler.end("run")
 
 
 def helper_write_to_json(device_type, measurements, output_filename):
