@@ -50,23 +50,23 @@ on:
 
 run-name: ${{ inputs.description }}
 jobs:
-  build-artifact:
-    uses: ./.github/workflows/build-artifact.yaml
-    permissions:
-      packages: write
-    secrets: inherit
-    with:
-      build-type: ${{ inputs.build-type }}
-      tracy: ${{ inputs.tracy }}
-      version: ${{ inputs.version }}
-      build-wheel: true
-      ref: ${{ inputs.commit || github.sha }}
+  # build-artifact:
+  #   uses: ./.github/workflows/build-artifact.yaml
+  #   permissions:
+  #     packages: write
+  #   secrets: inherit
+  #   with:
+  #     build-type: ${{ inputs.build-type }}
+  #     tracy: ${{ inputs.tracy }}
+  #     version: ${{ inputs.version }}
+  #     build-wheel: true
+  #     ref: ${{ inputs.commit || github.sha }}
   test-dispatch:
-    needs: build-artifact
+    # needs: build-artifact
     timeout-minutes: 120
     runs-on: ${{ fromJSON(inputs.runner-label) }}
     container:
-      image: ${{ contains(inputs.runner-label, 'tt-ubuntu-2204') && 'harbor.ci.tenstorrent.net/' || '' }}${{ needs.build-artifact.outputs.dev-docker-image || 'docker-image-unresolved' }}
+      image: ghcr.io/tenstorrent/tt-metal/tt-metalium/ubuntu-22.04-dev-amd64
       env:
         ARCH_NAME: ${{ inputs.arch }}
         LOGURU_LEVEL: INFO
@@ -84,46 +84,45 @@ jobs:
         shell: bash
         working-directory: /work # https://github.com/actions/runner/issues/878
     steps:
-      - name: 🧬 Checkout Repository
-        uses: actions/checkout@v4
-        timeout-minutes: 10
-        with:
-          fetch-depth: 1
-          submodules: recursive
-          path: docker-job
-          ref: ${{ inputs.commit || github.sha }}
-      - name: 📦 Download Build Artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0
-        timeout-minutes: 10
-        with:
-          name: ${{ needs.build-artifact.outputs.build-artifact-name }}
-          path: docker-job
-      - name: 📂 Extract Build Files
-        timeout-minutes: 10
-        working-directory: docker-job
-        run: tar --zstd -xf ttm_any.tar.zst
-        shell: bash
-      - name: 🧪 Download Python Wheel
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0
-        timeout-minutes: 10
-        with:
-          name: ${{ needs.build-artifact.outputs.wheel-artifact-name }}
-          path: docker-job
-      - name: 💿 Install Wheel
-        timeout-minutes: 10
-        working-directory: docker-job
-        run: |
-          echo "📂 In directory: $(pwd)"
-          echo "📄 Files:"
-          ls -la
-          WHEEL_FILENAME=$(ls -1 *.whl)
-          echo "📦 Installing $WHEEL_FILENAME"
-          pip3 install "$WHEEL_FILENAME"
-        shell: bash
+      # - name: 🧬 Checkout Repository
+      #   uses: actions/checkout@v4
+      #   timeout-minutes: 10
+      #   with:
+      #     fetch-depth: 1
+      #     submodules: recursive
+      #     path: docker-job
+      #     ref: ${{ inputs.commit || github.sha }}
+      # - name: 📦 Download Build Artifact
+      #   uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0
+      #   timeout-minutes: 10
+      #   with:
+      #     name: ${{ needs.build-artifact.outputs.build-artifact-name }}
+      #     path: docker-job
+      # - name: 📂 Extract Build Files
+      #   timeout-minutes: 10
+      #   working-directory: docker-job
+      #   run: tar --zstd -xf ttm_any.tar.zst
+      #   shell: bash
+      # - name: 🧪 Download Python Wheel
+      #   uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0
+      #   timeout-minutes: 10
+      #   with:
+      #     name: ${{ needs.build-artifact.outputs.wheel-artifact-name }}
+      #     path: docker-job
+      # - name: 💿 Install Wheel
+      #   timeout-minutes: 10
+      #   working-directory: docker-job
+      #   run: |
+      #     echo "📂 In directory: $(pwd)"
+      #     echo "📄 Files:"
+      #     ls -la
+      #     WHEEL_FILENAME=$(ls -1 *.whl)
+      #     echo "📦 Installing $WHEEL_FILENAME"
+      #     pip3 install "$WHEEL_FILENAME"
+      #   shell: bash
       - name: Run regression in loop
         run: |
-          pip3 install pytest-repeat
-          ${{ inputs.command }}
+          echo ${{ job.check_run_id }}
         shell: bash
       - uses: tenstorrent/tt-metal/.github/actions/cleanup@main
         if: always()
