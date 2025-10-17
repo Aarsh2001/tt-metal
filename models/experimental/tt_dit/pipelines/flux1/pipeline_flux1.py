@@ -207,17 +207,7 @@ class Flux1Pipeline:
                 eos_token_id=2,  # default EOS token ID for CLIP
             )
 
-            # self._text_encoder_1.load_torch_state_dict(torch_text_encoder_1.state_dict())
-            if not cache.initialize_from_cache(
-                self._text_encoder_1,
-                torch_text_encoder_1,
-                model_name,
-                "text_encoder_1",
-                encoder_parallel_config,
-                tuple(encoder_device.shape),
-            ):
-                logger.info(f"Loading text encoder 1 weights from PyTorch state dict")
-                self._text_encoder_1.load_torch_state_dict(torch_text_encoder_1.state_dict())
+            self._text_encoder_1.load_torch_state_dict(torch_text_encoder_1.state_dict())
 
         if enable_t5_text_encoder:
             if use_torch_t5_text_encoder:
@@ -322,17 +312,27 @@ class Flux1Pipeline:
         return pipeline
 
     def run_single_prompt(
-        self, *, width: int = 1024, height: int = 1024, prompt: str, num_inference_steps: int, seed: int, traced: bool
+        self,
+        *,
+        width: int = 1024,
+        height: int = 1024,
+        prompt: str,
+        negative_prompt: str = "",
+        num_inference_steps: int,
+        seed: int,
+        traced: bool = True,
     ):
         return self(
             width=width,
             height=height,
             prompt_1=[prompt],
             prompt_2=[prompt],
+            negative_prompt_1=[negative_prompt],
+            negative_prompt_2=[negative_prompt],
             num_inference_steps=num_inference_steps,
             seed=seed,
             traced=traced,
-        )[0]
+        )
 
     def __call__(
         self,

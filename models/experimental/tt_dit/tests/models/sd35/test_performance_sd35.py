@@ -9,7 +9,7 @@ from loguru import logger
 from models.perf.benchmarking_utils import BenchmarkProfiler, BenchmarkData
 
 from ....pipelines.stable_diffusion_35_large.pipeline_stable_diffusion_35_large import (
-    create_pipeline,
+    StableDiffusion3Pipeline,
     TimingCollector,
 )
 
@@ -83,7 +83,7 @@ def test_sd35_new_pipeline_performance(
     logger.info(f"  Guidance scale: {guidance_scale}")
     logger.info(f"  Inference steps: {num_inference_steps}")
 
-    pipeline = create_pipeline(
+    pipeline = StableDiffusion3Pipeline.create_pipeline(
         mesh_device=mesh_device,
         batch_size=1,
         image_w=image_w,

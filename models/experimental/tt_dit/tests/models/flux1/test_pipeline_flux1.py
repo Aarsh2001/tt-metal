@@ -165,7 +165,7 @@ def test_flux1_pipeline(
         )
 
         output_filename = f"{filename_prefix}_{number}.png"
-        images.save(output_filename)
+        images[0].save(output_filename)
         logger.info(f"Image saved as {output_filename}")
 
         timing_data = timing_collector.get_timing_data()

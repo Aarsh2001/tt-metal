@@ -104,7 +104,7 @@ def test_flux1_pipeline_performance(
     images = pipeline.run_single_prompt(
         width=image_w, height=image_h, prompt=prompts[0], num_inference_steps=num_inference_steps, seed=0, traced=True
     )
-    images.save(f"flux1_dev_{image_w}_{image_h}_warmup.png")
+    images[0].save(f"flux1_dev_{image_w}_{image_h}_warmup.png")
 
     warmup_timing = timer.get_timing_data()
     logger.info(f"Warmup completed in {warmup_timing.total_time:.2f}s")
@@ -140,7 +140,7 @@ def test_flux1_pipeline_performance(
                     seed=0,
                     traced=True,
                 )
-            images.save(f"flux1_dev_{image_w}_{image_h}_perf_run{i}.png")
+            images[0].save(f"flux1_dev_{image_w}_{image_h}_perf_run{i}.png")
 
             # Collect timing data
             timing_data = timer.get_timing_data()
