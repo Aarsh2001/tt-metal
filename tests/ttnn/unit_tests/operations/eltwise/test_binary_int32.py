@@ -6,6 +6,8 @@ import torch
 import pytest
 import ttnn
 
+from tests.ttnn.utils_for_testing import assert_with_ulp
+
 
 @pytest.mark.parametrize(
     "input_shapes",
@@ -649,3 +651,97 @@ def test_comp_ops_edge_cases(ttnn_op, device):
     output_tensor = ttnn.to_torch(output_tensor)
 
     assert torch.equal(output_tensor, torch_output_tensor)
+
+
+@pytest.mark.parametrize(
+    "ttnn_dtype, torch_dtype",
+    [
+        (ttnn.int32, torch.int32),
+        (ttnn.float32, torch.float32),
+    ],
+)
+def test_div_edge_cases(ttnn_dtype, torch_dtype, device):
+    pairs = [
+        (16777215, 1),
+        (16777216, 2),
+        (16777217, -7),
+        (-16777215, 3),
+        (-16777216, -4),
+        (-16777217, -5),
+        (2147483647, 1),
+        (-2147483647, 1),
+        (2147483647, -1e7),
+        (-2147483647, 1e4),
+        (2147483647, -2147483647),
+        (-2147483647, 2147483647),
+        (2147483647, 2147483647),
+        (-2147483647, -2147483647),
+        (2147483647, 1073741823),
+        (1073741823, -2147483647),
+        (1073741824, -2147483647),
+    ]
+
+    numerators, denominators = zip(*pairs)
+    torch_input_tensor_a = torch.tensor(numerators, dtype=torch_dtype)
+    input_tensor_a = ttnn.from_torch(
+        torch_input_tensor_a,
+        dtype=ttnn_dtype,
+        device=device,
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    )
+
+    torch_input_tensor_b = torch.tensor(denominators, dtype=torch_dtype)
+    input_tensor_b = ttnn.from_torch(
+        torch_input_tensor_b,
+        dtype=ttnn_dtype,
+        device=device,
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    )
+
+    golden_function = ttnn.get_golden_function(ttnn.div)
+    torch_output_tensor = golden_function(torch_input_tensor_a, torch_input_tensor_b, device=device)
+
+    output_tensor = ttnn.div(input_tensor_a, input_tensor_b, use_legacy=True)
+    output_tensor = ttnn.to_torch(output_tensor)
+    torch.set_printoptions(precision=10)
+
+    print(torch_output_tensor)
+    print(torch_output_tensor.dtype)
+    print(output_tensor)
+    print(output_tensor.dtype)
+
+    # assert torch.allclose(torch_output_tensor, output_tensor, atol=1e-10, rtol=1e-5, equal_nan=False)
+    assert_with_ulp(output_tensor, torch_output_tensor, ulp_threshold=1.0)
+    # assert torch.equal(output_tensor, torch_output_tensor)
+
+
+def test_div_inf_nan_cases(device):
+    torch_input_tensor_a = torch.tensor([0, 1, -1, 0, 0, 1, -1, -1, 1, 1000, 0], dtype=torch.int32)
+    input_tensor_a = ttnn.from_torch(
+        torch_input_tensor_a,
+        dtype=ttnn.int32,
+        device=device,
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    )
+
+    torch_input_tensor_b = torch.tensor([0, 0, 0, 1, -1, 1, -1, 1, -1, 0, -1000], dtype=torch.int32)
+    input_tensor_b = ttnn.from_torch(
+        torch_input_tensor_b,
+        dtype=ttnn.int32,
+        device=device,
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    )
+
+    golden_function = ttnn.get_golden_function(ttnn.div)
+    torch_output_tensor = golden_function(torch_input_tensor_a, torch_input_tensor_b, device=device)
+
+    output_tensor = ttnn.div(input_tensor_a, input_tensor_b, use_legacy=True)
+    output_tensor = ttnn.to_torch(output_tensor)
+
+    assert torch.allclose(
+        torch_output_tensor, output_tensor, atol=1e-10, rtol=1e-5, equal_nan=True
+    )  # equal_nan=True to handle -0 outputs in Torch

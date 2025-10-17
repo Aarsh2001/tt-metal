@@ -255,6 +255,7 @@ Tensor ExecuteDiv::invoke(
         TT_FATAL(
             not has_legacy_only_args,
             "round_mode, accurate_mode are not valid when passing use_legacy parameter in div");
+        std::cout << "In binary_composite_op.cpp under not legacy" << std::endl;
         return BinaryOperation<BinaryOpType::DIV>::invoke(
             input_a,
             input_b,
@@ -271,8 +272,11 @@ Tensor ExecuteDiv::invoke(
         (round_mode == std::nullopt || round_mode == "trunc" || round_mode == "floor"),
         "Incorrect rounding mode (expected None, 'trunc', or 'floor')");
 
+    std::cout << "In binary_composite_op.cpp under legacy" << std::endl;
+
     DataType input_dtype = input_a.dtype();
     const bool is_fp32 = input_dtype == DataType::FLOAT32 && input_b.dtype() == DataType::FLOAT32;
+    const bool is_int32 = input_dtype == DataType::INT32 && input_b.dtype() == DataType::INT32;
     Tensor result;
 
     // No accurate_mode for FP32 div as inf/nan are handled at kernel level
@@ -290,7 +294,7 @@ Tensor ExecuteDiv::invoke(
     } else if (round_mode == "floor") {
         result = ttnn::floor(result, output_mem_config, output_tensor);
     }
-    if (is_fp32) {
+    if (is_fp32 || is_int32) {
         return result;
     }
     return typecast(result, input_dtype, std::nullopt, output_tensor);
