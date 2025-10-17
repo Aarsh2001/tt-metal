@@ -10,8 +10,12 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Debug Check Run ID
+      run: |
+        echo "check_run_id=${{ job.check_run_id }}"
+      shell: bash
     - name: Report Github Pipeline Status Slack Action
-      if: ${{ github.ref == 'refs/heads/main' }}
+      # if: ${{ github.ref == 'refs/heads/main' }}
       uses: slackapi/slack-github-action@v1.26.0
       with:
         payload: |
