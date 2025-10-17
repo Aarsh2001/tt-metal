@@ -116,7 +116,7 @@ run_t3000_dit_tests() {
 }
 
 run_t3000_stable_diffusion_35_large_tests() {
-  run_t3000_dit_tests "models/experimental/tt_dit/tests/models/test_performance_sd35.py -k 2x4cfg1sp0tp1"
+  run_t3000_dit_tests "models/experimental/tt_dit/tests/models/sd35/test_performance_sd35.py -k 2x4cfg1sp0tp1"
 }
 
 run_t3000_flux1_tests() {

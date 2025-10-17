@@ -384,9 +384,9 @@ run_t3000_dit_tests() {
 
 run_t3000_sd35large_tests() {
   run_t3000_dit_tests \
-    "models/experimental/tt_dit/tests/models/test_vae_sd35.py -k t3k" \
-    "models/experimental/tt_dit/tests/models/test_attention_sd35.py" \
-    "models/experimental/tt_dit/tests/models/test_transformer_sd35.py::test_sd35_transformer_block"
+    "models/experimental/tt_dit/tests/models/sd35/test_vae_sd35.py -k t3k" \
+    "models/experimental/tt_dit/tests/models/sd35/test_attention_sd35.py" \
+    "models/experimental/tt_dit/tests/models/sd35/test_transformer_sd35.py::test_sd35_transformer_block"
 }
 
 run_t3000_flux1_tests() {
