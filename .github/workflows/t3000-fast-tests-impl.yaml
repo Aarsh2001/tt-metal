@@ -65,6 +65,14 @@ jobs:
           build-artifact-name: ${{ inputs.build-artifact-name }}
           wheel-artifact-name: ${{ inputs.wheel-artifact-name }}
           enable-watcher: ${{ inputs.enable-watcher || false }}
+      - name: Debug inputs
+        run: |
+          echo "run-fabric-tests: '${{ inputs.run-fabric-tests }}'"
+          echo "run-multiprocess-tests: '${{ inputs.run-multiprocess-tests }}'"
+          echo "run-ccl-tests: '${{ inputs.run-ccl-tests }}'"
+          echo "fabric condition: ${{ inputs.run-fabric-tests == 'true' }}"
+          echo "multiprocess condition: ${{ inputs.run-multiprocess-tests == 'true' }}"
+          echo "ccl condition: ${{ inputs.run-ccl-tests == 'true' }}"
       - name: Run t3k fabric tests
         id: t3k-fabric-tests
         timeout-minutes: 20
