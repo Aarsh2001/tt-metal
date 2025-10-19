@@ -13,12 +13,14 @@
 #include "ttnn/operations/core/compute_kernel/compute_kernel_config.hpp"
 #include "ttnn/operations/eltwise/unary/common/unary_op_utils.hpp"
 #include "ttnn/operations/eltwise/unary/common/unary_op_types.hpp"
+#include "ttnn/operations/sliding_window/op_slicing/op_slicing.hpp"
 
 namespace ttnn {
 
 namespace operations::conv {
 namespace conv2d {
 
+using Conv2dSliceConfig = op_slicing::Op2DSliceConfig;
 struct Conv2dConfig {
     // If set, the weights & bias tensors will be converted to this dtype after preprocessing.
     // prepare_conv_bias needs this to always be set to the same dtype as the weights.
