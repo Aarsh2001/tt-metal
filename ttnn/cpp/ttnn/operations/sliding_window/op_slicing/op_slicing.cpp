@@ -26,7 +26,7 @@ void run_sliced_op(
     uint32_t slice_rounding_value = 1;
     if (output_layout == tt::tt_metal::Layout::TILE &&
         dram_slice_config.slice_type == Op2DSliceConfig::SliceType::DRAM_WIDTH) {
-        // In Conv2d DRAM with Outputs in Tile layout, we need to round the slice size to a multiple of TILE_HEIGHT.
+        // In DRAM Slicing with Tile Layout, the width must be a multiple of TILE_HEIGHT.
         slice_rounding_value = tt::constants::TILE_HEIGHT;
     }
 
@@ -48,6 +48,8 @@ void run_sliced_op(
         const uint32_t this_output_slice_dim = output_slice_dim_end - output_slice_dim_start;
 
         if (this_output_slice_dim == 0) {
+            // No work to be done in this interation, so skip it.
+            slice_index++;
             continue;
         }
 
@@ -70,6 +72,8 @@ void run_sliced_op(
             input_slice_height_start = std::max<int>(0, input_slice_height_start);
             input_slice_height_end = std::min<int>(input_height, input_slice_height_end);
             if (input_slice_height_start >= input_slice_height_end) {
+                // No work to be done in this interation, so skip it.
+                slice_index++;
                 continue;
             }
         } else {
@@ -90,6 +94,8 @@ void run_sliced_op(
             input_slice_width_end = std::min<int>(input_width, input_slice_width_end);
 
             if (input_slice_width_start >= input_slice_width_end) {
+                // No work to be done in this interation, so skip it.
+                slice_index++;
                 continue;
             }
         }
@@ -115,7 +121,7 @@ void run_sliced_op(
 
         const uint32_t output_slice_height = output_slice_height_end - output_slice_height_start;
 
-        uint32_t output_slice_width = output_slice_width_end - output_slice_width_start;
+        const uint32_t output_slice_width = output_slice_width_end - output_slice_width_start;
 
         log_debug(
             tt::LogOp,
@@ -130,7 +136,7 @@ void run_sliced_op(
         auto sliced_input_tensor_memory_config = op_slice_attr->get_input_memory_config(
             {output_slice_height_start, output_slice_width_start}, {output_slice_height_end, output_slice_width_end});
 
-        Tensor sliced_input_tensor = ttnn::experimental::padded_slice(
+        const Tensor sliced_input_tensor = ttnn::experimental::padded_slice(
             input_tensor,
             ttnn::SmallVector<uint32_t>{0, input_slice_height_start, input_slice_width_start, 0},  // Start
             ttnn::SmallVector<uint32_t>{batch_size, input_slice_height_end, input_slice_width_end, input_channels},
