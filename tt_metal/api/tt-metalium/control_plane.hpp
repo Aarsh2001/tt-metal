@@ -270,6 +270,11 @@ private:
     void validate_mesh_connections(MeshId mesh_id) const;
     void validate_mesh_connections() const;
 
+
+    // Check if the physical system supports the specified fabric configuration
+    // Returns true if valid, false otherwise
+    bool is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_config, const std::string& torus_config = "") const;
+
     std::pair<FabricNodeId, chan_id_t> get_connected_mesh_chip_chan_ids(
         FabricNodeId fabric_node_id, chan_id_t chan_id) const;
 
@@ -368,6 +373,13 @@ private:
 
     std::shared_ptr<tt::tt_metal::distributed::multihost::DistributedContext> host_local_context_;
     std::unique_ptr<tt::tt_metal::PhysicalSystemDescriptor> physical_system_descriptor_;
+
+    // Cache for faster asic_id to fabric_node_id lookup
+    mutable std::unordered_map<uint64_t, FabricNodeId> asic_id_to_fabric_node_cache_;
+
+    // Private helper methods for torus validation
+    bool validate_torus_setup(const std::string& torus_config) const;
+    std::string get_cabling_descriptor_path(const std::string& torus_config) const;
 };
 
 }  // namespace tt::tt_fabric
