@@ -86,16 +86,15 @@ def test_gemma_vision(
     logger.info(f"PCC: {pcc_message}")
 
     assert passing, f"PCC value is lower than {pcc_required} for some of the outputs. Check Warnings!"
-    # proba()
 
 
 def test_proba():
     profiler = BenchmarkProfiler()
     benchmark_data = BenchmarkData()
     batch_size = 1
-    subdir = f"models/demos/gemma3/tests/"
+    subdir = f"/localdev/pmilojevic/tt-metal/generated/profiler/oft"
     num_iterations = 1
-    command = f"pytest models/demos/gemma3/tests/test_vision_cross_attention_transformer.py"
+    command = f"pytest models/demos/gemma3/tests/test_vision_cross_attention_transformer.py::test_gemma_vision"
     cols = ["DEVICE FW", "DEVICE KERNEL", "DEVICE BRISC KERNEL"]
     profiler.start("run")
     profiler.start("PROFILLING OP TO OP")

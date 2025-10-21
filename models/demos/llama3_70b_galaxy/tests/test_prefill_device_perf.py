@@ -173,9 +173,9 @@ def test_llama_TG_perf_device(
 ):
     profiler = BenchmarkProfiler()
     benchmark_data = BenchmarkData()
-    step_name = f"tg-llama-prefill-device-{galaxy_type}-perf-{seqlen}"
+    step_name = f"ttnn_gemma_cross_attention_perf_PREFILL_TEST"
     batch_size = 1
-    subdir = f"tg-llama-prefill-device-{galaxy_type}-perf-{seqlen}"
+    subdir = f"ttnn_gemma_cross_attention_perf"
     num_iterations = 1
     num_layers = 1
 
@@ -188,11 +188,11 @@ def test_llama_TG_perf_device(
         seqlen_file = f"input_data_questions_prefill_{seqlen}.json"
     else:
         seqlen_file = f"input_data_long_{seqlen // 1024}k.json"
-    command = f"pytest models/demos/llama3_70b_galaxy/demo/text_demo.py -k prefill-profile --input_prompts models/demos/llama3_70b_galaxy/demo/sample_prompts/{seqlen_file}"
+    command = f"pytest models/demos/gemma3/tests/test_vision_cross_attention_transformer.py::test_gemma_vision"
     cols = ["DEVICE FW", "DEVICE KERNEL", "DEVICE BRISC KERNEL"]
     profiler.start("run")
     profiler.start(step_name)
-    post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=True)
+    post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=False)
     profiler.end(step_name)
     profiler.end("run")
 
