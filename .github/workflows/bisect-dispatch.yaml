@@ -49,6 +49,11 @@ on:
         type: boolean
         default: true
         description: "Download artifacts from GitHub for each commit (requires gh cli to be authenticated)"
+      skip-commits:
+        required: false
+        type: string
+        default: ""
+        description: "Comma-separated list of commits to automatically skip (e.g., abc123,def456)"
       gist-url:
         required: false
         type: string
@@ -325,7 +330,9 @@ jobs:
           if [[ "${{ inputs.download-artifacts }}" == 'true' ]]; then
             bisect_args+=(-a)
           fi
-
+          if [[ "${{ inputs.skip-commits }}" != '' ]]; then
+            bisect_args+=(-c "${{ inputs.skip-commits }}")
+          fi
           bisect_args+=(-s "$SCRIPT_PATH")
 
           # Run bisect with clean, properly quoted arguments

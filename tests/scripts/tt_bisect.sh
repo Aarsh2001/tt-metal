@@ -14,6 +14,7 @@ Usage:
   -r RETRIES     : number of retries (default 3)
   -n             : enable non-deterministic detection mode (ND mode)
   -a             : enable artifact download optimization (requires gh CLI)
+  -c SKIP_LIST   : comma-separated list of commits to automatically skip
 Note: Either -f or -s must be specified, but not both.
 END
 
@@ -26,10 +27,11 @@ tracy_enabled=0
 retries=3
 nd_mode=false
 artifact_mode=false
+skip_commits=""
 run_idx=0
 timeout_rc=1
 
-while getopts ":f:s:g:b:t:pr:na" opt; do
+while getopts ":f:s:g:b:t:pr:nac:" opt; do
   case "$opt" in
     f) test="$OPTARG" ;;
     s) script_path="$OPTARG" ;;
@@ -40,6 +42,7 @@ while getopts ":f:s:g:b:t:pr:na" opt; do
     r) retries="$OPTARG" ;;
     n) nd_mode=true ;;
     a) artifact_mode=true ;;
+    c) skip_commits="$OPTARG" ;;
     \?) die "Invalid option: -$OPTARG" ;;
     :)  die "Option -$OPTARG requires an argument." ;;
   esac
@@ -70,6 +73,10 @@ fi
 
 if [ "$artifact_mode" = true ]; then
   echo "Artifact download optimization enabled."
+fi
+
+if [ -n "$skip_commits" ]; then
+  echo "Auto-skip commits list: $skip_commits"
 fi
 
 # Set up environment (skip if already in CI container with pre-configured venv)
@@ -121,6 +128,30 @@ print("ttnn imported from:", ttnn.__file__)
 PY
 }
 
+# Check if current commit should be auto-skipped
+should_skip_commit() {
+  local current_commit="$1"
+  local skip_list="$2"
+
+  if [ -z "$skip_list" ]; then
+    return 1  # Don't skip if no list provided
+  fi
+
+  # Split comma-separated list and check each commit
+  IFS=',' read -ra SKIP_ARRAY <<< "$skip_list"
+  for skip_sha in "${SKIP_ARRAY[@]}"; do
+    # Trim whitespace
+    skip_sha="$(echo "$skip_sha" | xargs)"
+
+    # Check if current commit starts with the skip SHA (supports short SHAs)
+    if [[ "$current_commit" == "$skip_sha"* ]] || [[ "$skip_sha" == "$current_commit"* ]]; then
+      return 0  # Should skip
+    fi
+  done
+
+  return 1  # Don't skip
+}
+
 # Try to download build artifacts from GitHub Actions using external script
 try_download_artifacts() {
   local commit_sha="$1"
@@ -146,6 +177,14 @@ found=false
 while [[ "$found" == "false" ]]; do
   rev="$(git rev-parse --short=12 HEAD)"
   full_sha="$(git rev-parse HEAD)"
+
+  # Check if this commit should be auto-skipped
+  if should_skip_commit "$full_sha" "$skip_commits"; then
+    echo "Auto-skipping commit $rev (matches skip list)"
+    git bisect skip
+    continue
+  fi
+
 
   commit_msg="$(git log -1 --pretty=%s HEAD)"
 
