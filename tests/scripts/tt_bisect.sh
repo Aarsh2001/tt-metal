@@ -144,7 +144,7 @@ should_skip_commit() {
     skip_sha="$(echo "$skip_sha" | xargs)"
 
     # Check if current commit starts with the skip SHA (supports short SHAs)
-    if [[ "$current_commit" == "$skip_sha"* ]] || [[ "$skip_sha" == "$current_commit"* ]]; then
+    if [[ "$current_commit" == "$skip_sha"* ]]; then
       return 0  # Should skip
     fi
   done
