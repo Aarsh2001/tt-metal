@@ -9,16 +9,11 @@ on:
         options:
           - wormhole_b0
           - blackhole
-      tracy:
+      tracy-nd-mode:
         required: true
-        type: boolean
-        default: false
-        description: "Build with tracy enabled"
-      nd-mode:
-        required: true
-        type: boolean
-        default: false
-        description: "Enable non-deterministic detection mode"
+        type: string
+        default: "0,0"
+        description: "Tracy and ND-mode flags (format: tracy,nd-mode, e.g., 1,0 for tracy only, 0,1 for nd-mode only, 1,1 for both)"
       runner-label:
         required: true
         type: choice
@@ -246,6 +241,25 @@ jobs:
           echo "✓ Parsed timeout: $TIMEOUT"
           echo "✓ Parsed retries: $RETRIES"
 
+          # Parse tracy and nd-mode from combined input
+          TRACY_ND='${{ inputs.tracy-nd-mode }}'
+          IFS=',' read -r TRACY_FLAG ND_FLAG <<< "$TRACY_ND"
+
+          # Validate parsed values
+          if [ -z "$TRACY_FLAG" ] || [ -z "$ND_FLAG" ]; then
+            echo "ERROR: Invalid tracy-nd-mode format. Expected 'tracy,nd-mode' (e.g., '1,0' or '0,1')"
+            exit 1
+          fi
+
+          # Validate they are 0 or 1
+          if [[ ! "$TRACY_FLAG" =~ ^[01]$ ]] || [[ ! "$ND_FLAG" =~ ^[01]$ ]]; then
+            echo "ERROR: tracy-nd-mode values must be 0 or 1. Got: '$TRACY_FLAG,$ND_FLAG'"
+            exit 1
+          fi
+
+          echo "✓ Parsed tracy flag: $TRACY_FLAG"
+          echo "✓ Parsed nd-mode flag: $ND_FLAG"
+
           # Validate command/gist-url exclusivity
           GIST_URL='${{ inputs.gist-url }}'
           COMMAND='${{ inputs.command }}'
@@ -274,6 +288,8 @@ jobs:
           echo "bad-commit=$BAD_COMMIT" >> $GITHUB_OUTPUT
           echo "timeout=$TIMEOUT" >> $GITHUB_OUTPUT
           echo "retries=$RETRIES" >> $GITHUB_OUTPUT
+          echo "tracy=$TRACY_FLAG" >> $GITHUB_OUTPUT
+          echo "nd-mode=$ND_FLAG" >> $GITHUB_OUTPUT
 
       - name: Run Git Bisect
         shell: bash
@@ -321,10 +337,10 @@ jobs:
           bisect_args+=(-g "$GOOD_COMMIT")
           bisect_args+=(-r "$RETRIES")
 
-          if [[ "${{ inputs.tracy }}" == 'true' ]]; then
+          if [[ "${{ steps.validate.outputs.tracy }}" == '1' ]]; then
             bisect_args+=(-p)
           fi
-          if [[ "${{ inputs.nd-mode }}" == 'true' ]]; then
+          if [[ "${{ steps.validate.outputs.nd-mode }}" == '1' ]]; then
             bisect_args+=(-n)
           fi
           if [[ "${{ inputs.download-artifacts }}" == 'true' ]]; then
