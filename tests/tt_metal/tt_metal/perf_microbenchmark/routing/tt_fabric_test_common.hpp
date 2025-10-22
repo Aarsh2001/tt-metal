@@ -123,13 +123,13 @@ public:
 
         FabricConfig new_fabric_config;
         if (topology == Topology::Torus) {
-            const auto& torus_config_str = fabric_setup.torus_config.value();
-            auto it = torus_topology_to_fabric_config_map.find({topology, torus_config_str, routing_type});
+            const auto& torus_config = fabric_setup.torus_config.value();
+            auto it = torus_topology_to_fabric_config_map.find({topology, torus_config, routing_type});
             TT_FATAL(
                 it != torus_topology_to_fabric_config_map.end(),
                 "Unsupported topology: {} with torus_config: {} and routing type: {}",
                 topology,
-                torus_config_str,
+                torus_config,
                 routing_type);
             new_fabric_config = it->second;
         } else {
