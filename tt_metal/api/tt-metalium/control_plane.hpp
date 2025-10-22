@@ -200,7 +200,7 @@ public:
 
     // Check if the physical system supports the specified fabric configuration
     // Returns true if valid, false otherwise
-    bool is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_config, const std::string& torus_config = "") const;
+    bool is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_config) const;
 
 private:
     // Check if the provided mesh is local to this host

@@ -2928,7 +2928,7 @@ AnnotatedIntermeshConnections ControlPlane::generate_intermesh_connections_on_lo
     return intermesh_connections;
 }
 
-bool ControlPlane::is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_config, const std::string& torus_config) const {
+bool ControlPlane::is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_config) const {
     if (fabric_config == tt::tt_fabric::FabricConfig::DISABLED) {
         return false;
     }

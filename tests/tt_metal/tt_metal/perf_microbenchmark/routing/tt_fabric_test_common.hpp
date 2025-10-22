@@ -160,8 +160,7 @@ public:
         
         // Use the new ControlPlane validation API - always skip on mismatch
         const auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
-        std::string torus_config_str = (topology == Topology::Torus) ? fabric_setup.torus_config.value() : "";
-        if (!control_plane.is_fabric_config_valid(new_fabric_config, torus_config_str)) {
+        if (!control_plane.is_fabric_config_valid(new_fabric_config)) {
             log_warning(tt::LogTest, "Fabric configuration validation failed - skipping test");
             return false;
         }
