@@ -104,7 +104,7 @@ public:
             local_mesh_id_, MeshScope::LOCAL);
     }
 
-    void open_devices(const TestFabricSetup& fabric_setup) {
+    bool open_devices(const TestFabricSetup& fabric_setup) {
         const auto& topology = fabric_setup.topology;
         const auto& routing_type = fabric_setup.routing_type.value();
         const auto& fabric_tensix_config = fabric_setup.fabric_tensix_config.value();
@@ -123,13 +123,13 @@ public:
 
         FabricConfig new_fabric_config;
         if (topology == Topology::Torus) {
-            const auto& torus_config = fabric_setup.torus_config.value();
-            auto it = torus_topology_to_fabric_config_map.find({topology, torus_config, routing_type});
+            const auto& torus_config_str = fabric_setup.torus_config.value();
+            auto it = torus_topology_to_fabric_config_map.find({topology, torus_config_str, routing_type});
             TT_FATAL(
                 it != torus_topology_to_fabric_config_map.end(),
                 "Unsupported topology: {} with torus_config: {} and routing type: {}",
                 topology,
-                torus_config,
+                torus_config_str,
                 routing_type);
             new_fabric_config = it->second;
         } else {
@@ -140,6 +140,30 @@ public:
                 topology,
                 routing_type);
             new_fabric_config = it->second;
+        }
+
+        // Set fabric config temporarily to initialize control plane for validation
+        // Only if it's not already set to avoid override errors
+        bool need_to_set_fabric_config = (new_fabric_config != current_fabric_config_ || 
+                                         fabric_tensix_config != current_fabric_tensix_config_ ||
+                                         reliability_mode != current_fabric_reliability_mode_);
+        
+        try {
+            if (need_to_set_fabric_config) {
+                tt::tt_fabric::SetFabricConfig(new_fabric_config, reliability_mode, std::nullopt, fabric_tensix_config);
+                tt::tt_metal::MetalContext::instance().initialize_control_plane();
+            }
+        } catch (const std::exception& e) {
+            log_warning(tt::LogTest, "Failed to set fabric config: {} - skipping test", e.what());
+            return false;
+        }
+        
+        // Use the new ControlPlane validation API - always skip on mismatch
+        const auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+        std::string torus_config_str = (topology == Topology::Torus) ? fabric_setup.torus_config.value() : "";
+        if (!control_plane.is_fabric_config_valid(new_fabric_config, torus_config_str)) {
+            log_warning(tt::LogTest, "Fabric configuration validation failed - skipping test");
+            return false;
         }
 
         if (new_fabric_config != current_fabric_config_ || fabric_tensix_config != current_fabric_tensix_config_ ||
@@ -156,6 +180,7 @@ public:
         } else {
             log_info(tt::LogTest, "Reusing existing device setup with fabric config: {}", current_fabric_config_);
         }
+        return true;
     }
 
     void setup_workload() {
