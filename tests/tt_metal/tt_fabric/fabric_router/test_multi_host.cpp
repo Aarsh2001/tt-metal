@@ -445,10 +445,11 @@ TEST(MultiHost, TestClosetBoxTTSwitchControlPlaneInit) {
 
     // Get the host name
     auto host_rank = *instance.get_distributed_context_ptr()->rank();
+    auto host_name = instance.get_distributed_context_ptr()->hostname();
 
     // Savve the cluster descriptors
     auto cluster_descriptor = instance.get_cluster().get_cluster_desc()->serialize_to_file(
-        "closet_box_cluster_desc_rank_" + std::to_string(host_rank) + ".yaml");
+        "closet_box_cluster_desc_" + host_name + "_rank_" + std::to_string(host_rank) + ".yaml");
 }
 
 }  // namespace multi_host_tests
