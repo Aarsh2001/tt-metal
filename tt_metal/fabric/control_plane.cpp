@@ -28,6 +28,8 @@
 #include "core_coord.hpp"
 #include "compressed_routing_table.hpp"
 #include "compressed_routing_path.hpp"
+#include "tools/scaleout/cabling_generator/cabling_generator.hpp"
+#include "tools/scaleout/factory_system_descriptor/utils.hpp"
 #include "hostdevcommon/fabric_common.h"
 #include "distributed_context.hpp"
 #include "fabric_types.hpp"
@@ -2941,12 +2943,7 @@ bool ControlPlane::is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_con
     };
     
     if (torus_fabric_configs.count(fabric_config)) {
-        static const std::unordered_set<std::string> valid_torus_config_strings = {"X", "Y", "XY", ""};
-        if (!valid_torus_config_strings.count(torus_config)) {
-            return false;
-        }
-        
-        return validate_torus_setup(torus_config);
+        return validate_torus_setup(fabric_config);
     }
     
     // Non-torus configurations are valid by default since we always have at least mesh topology,
@@ -2954,7 +2951,7 @@ bool ControlPlane::is_fabric_config_valid(tt::tt_fabric::FabricConfig fabric_con
     return true;
 }
 
-bool ControlPlane::validate_torus_setup(const std::string& torus_config) const {
+bool ControlPlane::validate_torus_setup(tt::tt_fabric::FabricConfig fabric_config) const {
     try {
         const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster().get_driver();
         auto distributed_context = tt::tt_metal::MetalContext::instance().get_distributed_context_ptr();
@@ -2973,7 +2970,7 @@ bool ControlPlane::validate_torus_setup(const std::string& torus_config) const {
         auto all_hostnames = physical_system_descriptor.get_all_hostnames();
 
         // Get the cabling descriptor path for the expected torus configuration
-        auto cabling_descriptor_path = get_cabling_descriptor_path(torus_config);
+        auto cabling_descriptor_path = get_cabling_descriptor_path(fabric_config);
 
         // Check if the cabling descriptor file exists
         if (!std::filesystem::exists(cabling_descriptor_path)) {
@@ -3002,25 +2999,33 @@ bool ControlPlane::validate_torus_setup(const std::string& torus_config) const {
         std::filesystem::remove(temp_fsd_path);
         std::filesystem::remove(temp_gsd_path);
 
-        log_info(tt::LogFabric, "Torus validation passed for configuration: {}", torus_config);
+        log_info(tt::LogFabric, "Torus validation passed for configuration: {}", static_cast<int>(fabric_config));
         return true;
 
     } catch (const std::exception& e) {
-        log_warning(tt::LogFabric, "Torus validation failed for configuration '{}': {}", torus_config, e.what());
+        log_warning(tt::LogFabric, "Torus validation failed for configuration '{}': {}", static_cast<int>(fabric_config), e.what());
         return false;  // Return false to skip the test
     }
 }
 
-std::string ControlPlane::get_cabling_descriptor_path(const std::string& torus_config) const {
-    static const std::unordered_map<std::string, std::string> cabling_map = {
-        {"X", "tools/tests/scaleout/cabling_descriptors/wh_galaxy_x_torus_superpod.textproto"},
-        {"Y", "tools/tests/scaleout/cabling_descriptors/wh_galaxy_y_torus_superpod.textproto"},
-        {"XY", "tools/tests/scaleout/cabling_descriptors/wh_galaxy_xy_torus_superpod.textproto"}
+std::string ControlPlane::get_cabling_descriptor_path(tt::tt_fabric::FabricConfig fabric_config) const {
+    static const std::string X_TORUS_PATH = "tools/tests/scaleout/cabling_descriptors/wh_galaxy_x_torus_superpod.textproto";
+    static const std::string Y_TORUS_PATH = "tools/tests/scaleout/cabling_descriptors/wh_galaxy_y_torus_superpod.textproto";
+    static const std::string XY_TORUS_PATH = "tools/tests/scaleout/cabling_descriptors/wh_galaxy_xy_torus_superpod.textproto";
+    
+    static const std::unordered_map<tt::tt_fabric::FabricConfig, std::string> cabling_map = {
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_TORUS_X, X_TORUS_PATH},
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC_TORUS_X, X_TORUS_PATH},
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_TORUS_Y, Y_TORUS_PATH},
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC_TORUS_Y, Y_TORUS_PATH},
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_TORUS_XY, XY_TORUS_PATH},
+        {tt::tt_fabric::FabricConfig::FABRIC_2D_DYNAMIC_TORUS_XY, XY_TORUS_PATH}
     };
 
-    auto it = cabling_map.find(torus_config);
+    auto it = cabling_map.find(fabric_config);
     if (it == cabling_map.end()) {
-        throw std::runtime_error("Unknown torus configuration: " + torus_config);
+        log_warning(tt::LogFabric, "Unknown torus configuration: {}", static_cast<int>(fabric_config));
+        return "";  // Return empty string for unknown configurations
     }
 
     const auto& root_dir = tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir();
