@@ -353,6 +353,17 @@ run_t3000_gemma3_tests() {
   echo "LOG_METAL: run_t3000_gemma3_tests $duration seconds to complete"
 }
 
+run_t3000_gemma3_target_maker() {
+  # Record the start time
+  start_time=$(date +%s)
+  HF_MODEL=/mnt/MLPerf/tt_dnn-models/google/gemma-3-27b-it pytest models/demos/gemma3/target_maker.py
+  echo "LOG_METAL: Gemma3 27B target maker completed (text and vision)"
+  # Record the end time
+  end_time=$(date +%s)
+  duration=$((end_time - start_time))
+  echo "LOG_METAL: run_t3000_gemma3_target_maker $duration seconds to complete"
+}
+
 run_t3000_tests() {
   # Run llama3 load checkpoints tests
   run_t3000_llama3_load_checkpoints_tests

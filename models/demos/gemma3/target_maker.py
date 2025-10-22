@@ -1,5 +1,3 @@
-import json
-
 import pandas as pd
 from tracy.process_model_log import get_latest_ops_log_filename
 
@@ -112,26 +110,39 @@ def test():
     cols = ["DEVICE FW", "DEVICE KERNEL", "DEVICE BRISC KERNEL"]
     profiler.start("run")
     profiler.start("PROFILLING OP TO OP")
-    post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=False)
-    profiler.end("PROFILLING OP TO OP")
-    profiler.end("run")
 
-    filename = get_latest_ops_log_filename(subdir)
-    df = pd.read_csv(filename)
-    df = df[df["OP TYPE"].isin(["tt_dnn_device"])]
-    df = merge_device_rows(df)
+    all_results_average = []
+    all_results_max = []
+    all_results_min = []
 
-    ops_raw_dict = df[["OP CODE", "DEVICE KERNEL DURATION [ns]"]].to_dict(orient="records")
-    kernel_duration_dict = build_duration_dict(ops_raw_dict, "DEVICE KERNEL DURATION [ns]")
-    kernel_duration_per_instance_dict = build_duration_per_instance_dict(kernel_duration_dict, 1)
-    # Min over all iterations of each op instance
-    kernel_duration_per_instance_min_dict = min_per_instance_dict(kernel_duration_per_instance_dict)
-    # Max over all iterations of each op instance
-    kernel_duration_per_instance_max_dict = max_per_instance_dict(kernel_duration_per_instance_dict)
-    # Average over all iterations of each op instance (in this specific case it is the same)
-    kernel_duration_per_instance_averaged_dict = average_per_instance_dict(kernel_duration_per_instance_dict)
+    # Run tracy 3 times and make target out of it
+    for i in range(3):
+        post_processed_results = run_device_perf(command, subdir, num_iterations, cols, batch_size, has_signposts=False)
+        profiler.end("PROFILLING OP TO OP")
+        profiler.end("run")
 
-    expected_perf_cols = {}
-    with open(f"models/demos/gemma3/tests/perf_targets/targets_test_perf_vision_cross_attention_ops.json", "r") as f:
-        expected_perf_cols = json.load(f)
-    compare_with_target(kernel_duration_per_instance_averaged_dict, expected_perf_cols, profiler)
+        filename = get_latest_ops_log_filename(subdir)
+        df = pd.read_csv(filename)
+        df = df[df["OP TYPE"].isin(["tt_dnn_device"])]
+        df = merge_device_rows(df)
+
+        ops_raw_dict = df[["OP CODE", "DEVICE KERNEL DURATION [ns]"]].to_dict(orient="records")
+        kernel_duration_dict = build_duration_dict(ops_raw_dict, "DEVICE KERNEL DURATION [ns]")
+        kernel_duration_per_instance_dict = build_duration_per_instance_dict(kernel_duration_dict, 1)
+        # Min over all iterations of each op instance
+        kernel_duration_per_instance_min_dict = min_per_instance_dict(kernel_duration_per_instance_dict)
+        # Max over all iterations of each op instance
+        kernel_duration_per_instance_max_dict = max_per_instance_dict(kernel_duration_per_instance_dict)
+        # Average over all iterations of each op instance (in this specific case it is the same)
+        kernel_duration_per_instance_averaged_dict = average_per_instance_dict(kernel_duration_per_instance_dict)
+
+        all_results_average.append(kernel_duration_per_instance_averaged_dict)
+        all_results_max.append(kernel_duration_per_instance_max_dict)
+        all_results_min.append(kernel_duration_per_instance_min_dict)
+
+    logger.info(f"Generated target kernel durations: {all_results_average}")
+
+    # expected_perf_cols = {}
+    # with open(f"models/demos/gemma3/tests/perf_targets/targets_test_perf_vision_cross_attention_ops.json", "r") as f:
+    #     expected_perf_cols = json.load(f)
+    # compare_with_target(kernel_duration_per_instance_averaged_dict, expected_perf_cols, profiler)
